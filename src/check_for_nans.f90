@@ -11,7 +11,7 @@ subroutine check_for_nans_ions(cMarker)
   implicit none
 
   character(LEN=*), intent(in) :: cMarker
-  integer :: iLon, iLat, iAlt, iIon
+  integer :: iLon, iLat, iAlt, iIon, iDir
   logical :: IsFound
 
   IsFound = .false.
@@ -20,21 +20,23 @@ subroutine check_for_nans_ions(cMarker)
       do iAlt = -1, nAlts + 2
         do iIon = 1, nIons
           if (ieee_is_nan(iDensityS(iLon, iLat, iAlt, iIon, 1))) then
-            write(*, *) 'Nan found in iDensityS : '
-            write(*, *) cMarker
-            write(*, *) iLon, iLat, iAlt, iProc, iIon
+            write(*, *) 'Nan found in iDensityS : ', cMarker
+            write(*, *) "    species:", cIons(iIon)
+            call print_error_location(iLon, iLat, iAlt, 1)
             IsFound = .true.
           endif
-          if (ieee_is_nan(IVelocity(iLon, iLat, iAlt, 1, 1))) then
-            write(*, *) 'Nan found in iVelocity!! : '
-            write(*, *) cMarker
-            write(*, *) iLon, iLat, iAlt, iProc, iIon
+          do iDir = 1, 3
+          if (ieee_is_nan(IVelocity(iLon, iLat, iAlt, iDir, 1))) then
+            write(*, *) 'Nan found in iVelocity!! : ', cMarker
+            write(*, *) "    direction:", iDir
+            call print_error_location(iLon, iLat, iAlt, 1)
             IsFound = .true.
           endif
+          enddo
           if (iDensityS(iLon, iLat, iAlt, iIon, 1) < 0.0) then
-            write(*, *) 'Negative density found in iDensityS : '
-            write(*, *) cMarker
-            write(*, *) iLon, iLat, iAlt, iProc, iIon
+            write(*, *) 'Negative density found in iDensityS : ', cMarker
+            write(*, *) "    species:", cIons(iIon)
+            call print_error_location(iLon, iLat, iAlt, 1)
             IsFound = .true.
           endif
         enddo
@@ -65,15 +67,15 @@ subroutine check_for_nans_neutrals(cMarker)
       do iAlt = -1, nAlts + 2
         do iNeu = 1, nSpecies
           if (ieee_is_nan(nDensityS(iLon, iLat, iAlt, iNeu, 1))) then
-            write(*, *) 'Nan found in nDensityS : '
-            write(*, *) cMarker
-            write(*, *) iLon, iLat, iAlt, iProc, iNeu
+            write(*, *) 'Nan found in nDensityS : ', cMarker
+            write(*, *) "    species:", cSpecies(iNeu)
+            call print_error_location(iLon, iLat, iAlt, 1)
             IsFound = .true.
           endif
           if (nDensityS(iLon, iLat, iAlt, iNeu, 1) < 0.0) then
-            write(*, *) 'Negative density found in nDensityS : '
-            write(*, *) cMarker
-            write(*, *) iLon, iLat, iAlt, iProc, iNeu
+            write(*, *) 'Negative density found in nDensityS : ', cMarker
+            write(*, *) "    species:", cSpecies(iNeu)
+            call print_error_location(iLon, iLat, iAlt, 1)
             IsFound = .true.
           endif
         enddo
@@ -103,40 +105,34 @@ subroutine check_for_nans_temps(cMarker)
     do iLat = -1, nLats + 2
       do iAlt = -1, nAlts + 2
         if (ieee_is_nan(Temperature(iLon, iLat, iAlt, 1))) then
-          write(*, *) 'Nan found in Temperature : '
-          write(*, *) cMarker
-          write(*, *) iLon, iLat, iAlt, iProc
+          write(*, *) 'Nan found in Temperature : ', cMarker
+          call print_error_location(iLon, iLat, iAlt, 1)
           IsFound = .true.
         endif
         if (ieee_is_nan(iTemperature(iLon, iLat, iAlt, 1))) then
-          write(*, *) 'Nan found in iTemperature : '
-          write(*, *) cMarker
-          write(*, *) iLon, iLat, iAlt, iProc
+          write(*, *) 'Nan found in iTemperature : ', cMarker
+          call print_error_location(iLon, iLat, iAlt, 1)
           IsFound = .true.
         endif
         if (ieee_is_nan(eTemperature(iLon, iLat, iAlt, 1))) then
-          write(*, *) 'Nan found in eTemperature : '
-          write(*, *) cMarker
-          write(*, *) iLon, iLat, iAlt, iProc
+          write(*, *) 'Nan found in eTemperature : ', cMarker
+          call print_error_location(iLon, iLat, iAlt, 1)
           IsFound = .true.
         endif
         ! Check for negative Temperatures:
         if (Temperature(iLon, iLat, iAlt, 1) < 0.0) then
-          write(*, *) 'Negative found in Temperature : '
-          write(*, *) cMarker
-          write(*, *) iLon, iLat, iAlt, iProc
+          write(*, *) 'Negative found in Temperature : ', cMarker
+          call print_error_location(iLon, iLat, iAlt, 1)
           IsFound = .true.
         endif
         if (iTemperature(iLon, iLat, iAlt, 1) < 0.0) then
-          write(*, *) 'Negative found in iTemperature : '
-          write(*, *) cMarker
-          write(*, *) iLon, iLat, iAlt, iProc
+          write(*, *) 'Negative found in iTemperature : ', cMarker
+          call print_error_location(iLon, iLat, iAlt, 1)
           IsFound = .true.
         endif
         if (eTemperature(iLon, iLat, iAlt, 1) < 0.0) then
-          write(*, *) 'Negative found in eTemperature : '
-          write(*, *) cMarker
-          write(*, *) iLon, iLat, iAlt, iProc
+          write(*, *) 'Negative found in eTemperature : ', cMarker
+          call print_error_location(iLon, iLat, iAlt, 1)
           IsFound = .true.
         endif
       enddo
@@ -166,10 +162,11 @@ subroutine correct_min_ion_density
             do iLat = -1, nLats + 2
               do iAlt = -1, nAlts + 2
                 if (iDensityS(iLon, iLat, iAlt, iIon, 1) < MinIonDensity) then
-                  if (iDebugLevel > 7) &
-                    write(*, *) ' -> low density found in iDensityS : ', &
-                    iLon, iLat, iAlt, iProc, iIon, iDensityS(iLon, iLat, iAlt, iIon, 1), &
-                    MinIonDensity
+                  if (iDebugLevel > 7) then
+                    write(*, *) ' -> low density found in iDensityS : '
+                    write(*, *) "    species:", cIons(iIon)
+                    call print_error_location(iLon, iLat, iAlt, 1)
+                  endif
                   iDensityS(iLon, iLat, iAlt, iIon, 1) = MinIonDensity
                 endif
               enddo
@@ -182,10 +179,11 @@ subroutine correct_min_ion_density
             do iLat = -1, nLats + 2
               do iAlt = -1, nAlts + 2
                 if (iDensityS(iLon, iLat, iAlt, iIon, 1) < MinIonDensityAdvect) then
-                  if (iDebugLevel > 7) &
-                    write(*, *) ' -> low density found in iDensityS : ', &
-                    iLon, iLat, iAlt, iProc, iIon, iDensityS(iLon, iLat, iAlt, iIon, 1), &
-                    MinIonDensity
+                  if (iDebugLevel > 7) then
+                    write(*, *) ' -> low density found in iDensityS : '
+                    write(*, *) "    species:", cIons(iIon)
+                    call print_error_location(iLon, iLat, iAlt, 1)
+                  endif
                   iDensityS(iLon, iLat, iAlt, iIon, 1) = MinIonDensityAdvect
                 endif
               enddo
@@ -199,3 +197,21 @@ subroutine correct_min_ion_density
   return
 
 end subroutine correct_min_ion_density
+
+subroutine print_error_location(iLon, iLat, iAlt, iBlock)
+  !! Refactor error message to see where error occurs more easily
+  use ModGITM
+
+  integer, intent(in) :: iLon, iLat, iAlt, iBlock
+
+  write(*, *) " ->> On iProc:", iProc, " iLon:", iLon, " iLat:", iLat, &
+    " iAlt:", iAlt, " iBlock:", iBlock
+  write(*, *) " --->>> (radians) Longitude, Latitude, Altitude: "
+  write(*, *) "       ", Longitude(iLon, iBlock), Latitude(iLat, iBlock), Altitude_GB(iLon, iLat, iAlt, iBlock)
+  write(*, *) " --->>> (degrees): "
+  write(*, *) "       ", 180.*Longitude(iLon, iBlock)/pi, 180*Latitude(iLat, iBlock)/pi, &
+    Altitude_GB(iLon, iLat, iAlt, iBlock)/1000.
+  ! if (present(varname)) write(*,*) " ->  in variable: ", varName
+  ! if (present(values)) write(*,*) " -> With value: ", values
+
+end subroutine print_error_location

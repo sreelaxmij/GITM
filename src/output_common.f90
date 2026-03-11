@@ -24,7 +24,7 @@ integer function bad_outputtype()
 
   implicit none
 
-  integer, parameter :: nValidTypes = 25
+  integer, parameter :: nValidTypes = 26
   integer :: j, iOutputType
   logical :: IsFound
 
@@ -32,9 +32,10 @@ integer function bad_outputtype()
 
   ! Set up all possible/valid plot types:
   NameValidTypes = (/'3DALL', '3DLST', '3DNEU', '3DION', '3DTHM', '3DCHM', &
-                     '3DUSR', '3DGLO', '3DMAG', '3DHME', '2DGEL', '2DMEL', '2DUSR', &
-                     '2DTEC', '2DANC', '2DHME', '1DALL', '0DALL', '1DGLO', '1DTHM', '1DNEW', &
-                     '1DCHM', '1DCMS', '1DUSR', '0DUSR'/)
+                     '3DUSR', '3DGLO', '3DMAG', '3DHME', '3DPOT', &
+                     '2DGEL', '2DMEL', '2DUSR', '2DTEC', '2DANC', '2DHME', &
+                     '1DALL', '1DGLO', '1DTHM', '1DNEW', '1DCHM', '1DCMS', '1DUSR', &
+                     '0DALL', '0DUSR'/)
 
   ! Loop over all requested output types:
   do iOutputType = 1, nOutputTypes
@@ -346,6 +347,11 @@ subroutine output(dir, iBlock, iOutputType)
     ! for iProc=0. Header files are always written by iProc=0.
     if (DoSaveHIMEPlot) call output_3dhme(iBlock)
 
+  case ('3DPOT')
+
+    nVars_to_Write = 9
+    call output_3dpot(iBlock)
+
   case ('2DGEL')
 
     nvars_to_write = 19
@@ -635,8 +641,18 @@ contains
 
     endif
 
-    if (cType(3:5) == "TEC") then
+    if (cType(3:5) == "POT") then
 
+      write(iOutputUnit_, "(I7,A1,a)") 4, " ", "Magnetic Latitude"
+      write(iOutputUnit_, "(I7,A1,a)") 4, " ", "Magnetic Longitude"
+      write(iOutputUnit_, "(I7,A1,a)") 4, " ", "Magnetospheric Potential"
+      write(iOutputUnit_, "(I7,A1,a)") 4, " ", "Dynamo Potential"
+      write(iOutputUnit_, "(I7,A1,a)") 4, " ", "Total Potential"
+      write(iOutputUnit_, "(I7,A1,a)") 5, " ", "Potential Y"
+
+    endif
+
+    if (cType(3:5) == "TEC") then
       write(iOutputUnit_, "(I7,A1,a)") 4, " ", "Solar Zenith Angle"
       write(iOutputUnit_, "(I7,A1,a)") 5, " ", "Vertical TEC"
 
@@ -1752,6 +1768,38 @@ subroutine output_3dmag(iBlock)
   enddo
 
 end subroutine output_3dmag
+
+! The dynamo, magnetospheric, and total potential
+
+subroutine output_3dpot(iBlock)
+
+  use ModGITM
+  use ModInputs
+
+  implicit none
+
+  integer, intent(in) :: iBlock
+  integer :: iLat, iLon, iAlt
+
+  do iAlt = -1, nAlts + 2
+    do iLat = -1, nLats + 2
+      do iLon = -1, nLons + 2
+        write(iOutputUnit_) &
+          Longitude(iLon, iBlock), &
+          Latitude(iLat, iBlock), &
+          Altitude_GB(iLon, iLat, iAlt, iBlock), &
+          mLatitude(iLon, iLat, iAlt, iBlock), &
+          mLongitude(iLon, iLat, iAlt, iBlock), &
+          MagnetosphericPotential(iLon, iLat, iAlt), &
+          DynamoPotential(iLon, iLat, iAlt), &
+          Potential(iLon, iLat, iAlt, iBlock), &
+          PotentialY(iLon, iLat, iAlt, iBlock)
+        ! B0 has 4 elements of the geomag field, the E, N, Up, and magnitude
+      enddo
+    enddo
+  enddo
+
+end subroutine output_3dpot
 
 !----------------------------------------------------------------
 

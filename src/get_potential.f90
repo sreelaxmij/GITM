@@ -215,7 +215,7 @@ subroutine get_potential(iBlock)
         if (IsFramework) then
           LatBoundNow = 45.
         else
-          LatBoundNow = DynamoHighLatBoundary
+          LatBoundNow = min(IEModel_%LatBoundPotential, DynamoHighLatBoundary)
         endif
 
         do iDir = 1, nDir
