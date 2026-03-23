@@ -41,6 +41,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   integer :: i, j, k, bs, iError, iBlock, iDir, iLon, iLat, iAlt, ip, im, iOff
 
   integer :: iEquator
+  integer :: jNH, jSH
 
   real :: GeoLat, GeoLon, GeoAlt, xAlt, len, ped, hal
   real :: sp_d1d1_d, sp_d2d2_d, sp_d1d2_d, sh
@@ -103,6 +104,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
     nMagLats = (2*DynamoHighLatBoundary)/MagLatRes + 1
     nMagLons = 360.0/MagLonRes
+    nMagHemiLats = DynamoHighLatBoundary/MagLatRes + 1
 
     allocate(DivJuAltMC(nMagLons + 1, nMagLats), &
              SigmaHallMC(nMagLons + 1, nMagLats), &
@@ -146,6 +148,15 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     allocate(SmallMagLocTimeMC(nMagLons + 1, 2), &
              SmallMagLatMC(nMagLons + 1, 2), &
              SmallPotentialMC(nMagLons + 1, 2), &
+             stat=iError)
+
+
+    allocate(aNH(nMagLons, nMagHemiLats), bNH(nMagLons, nMagHemiLats), &
+           cNH(nMagLons, nMagHemiLats), dNH(nMagLons, nMagHemiLats), &
+           eNH(nMagLons, nMagHemiLats), sNH(nMagLons, nMagHemiLats), &
+           aSH(nMagLons, nMagHemiLats), bSH(nMagLons, nMagHemiLats), &
+           cSH(nMagLons, nMagHemiLats), dSH(nMagLons, nMagHemiLats), &
+           eSH(nMagLons, nMagHemiLats), sSH(nMagLons, nMagHemiLats), &
              stat=iError)
 
     DivJuAltMC = 0.0

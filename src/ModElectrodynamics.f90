@@ -22,6 +22,10 @@ module ModElectrodynamics
     KDpm, KDlm, Kpm, Klm
   real, dimension(-1:nLons + 2, -1:nLats + 2, -1:nAlts + 2) :: ed1, ed2, je1, je2
 
+  ! These are the GITM coefficients in each hemisphere in magnetic coordinates
+  real, allocatable :: aNH(:,:), bNH(:,:), cNH(:,:), dNH(:,:), eNH(:,:), sNH(:,:)
+  real, allocatable :: aSH(:,:), bSH(:,:), cSH(:,:), dSH(:,:), eSH(:,:), sSH(:,:)
+  
   ! This is the field aligned integral in magnetic coordinates
   real, dimension(:, :), allocatable :: DivJuAltMC
 
@@ -76,7 +80,7 @@ module ModElectrodynamics
   integer :: nMagLons = 90  ! 4 degrees
   real :: MagLatRes = 0.5
   real :: MagLonRes = 4.0
-
+  integer :: nMagHemiLats = 90
   !----------------------------------------------------------------------
   ! These are in geographic coordinates :
 
