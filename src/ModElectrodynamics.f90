@@ -62,12 +62,14 @@ module ModElectrodynamics
     solver_s_mc, deltalmc, deltapmc, &
     dSigmaLLdlMC, dSigmaLPdlMC, dSigmaPLdpMC, dSigmaPPdpMC, &
     dKDpmdpMC, dKDlmdlMC, DynamoPotentialMC, &
-    dKpmdpMC, dKlmdlMC
+    dKpmdpMC, dKlmdlMC, &
+    solver_amc, solver_bmc, solver_cmc, solver_dmc, solver_emc, &
+    solver_smc, DynamoPotential_MC
 
   real, dimension(:, :), allocatable :: oldpotmc
 
   real, dimension(:), allocatable :: &
-    x, y, rhs, b, d_I, e_I, e1_I, f_I, f1_I
+    x, y, rhs, b, d_I, e_I, e1_I, f_I, f1_I, d_lu, e_lu, e1_lu, f_lu, f1_lu, c_I
 
   real, dimension(:, :), allocatable :: &
     SmallMagLocTimeMC, SmallMagLatMC, SmallPotentialMC

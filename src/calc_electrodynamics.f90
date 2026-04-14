@@ -1,5 +1,537 @@
 ! Copyright 2021, the GITM Development Team (see srcDoc/dev_team.md for members)
 ! Full license can be found in LICENSE
+! module ModInterleavedIndexing
+!   implicit none
+!   private
+
+!   ! Public symbols
+!   public :: NH, SH
+!   public :: idxN, idxS, idxH
+!   public :: inv_idx
+!   public :: wrap_lon
+!   public :: valid_lat
+!   public :: other_hemi
+!   public :: E_idx, W_idx
+!   public :: N_idx, S_idx
+!   public :: NE_idx, NW_idx
+!   public :: SE_idx, SW_idx
+
+!   integer, parameter :: NH = 1
+!   integer, parameter :: SH = 2
+
+! contains
+
+!   ! NH index at (iLon, j)
+!   ! (latitude) j outer, iLon inner, and at each cell: NH then SH
+!   integer function idxN(iLon, j, nLon) result(i)
+!     implicit none
+!     integer, intent(in) :: iLon, j, nLon
+!     i = 2 * ( (j - 1) * nLon + (iLon - 1) ) + 1
+!   end function idxN
+
+!   ! SH index at (iLon, j)
+!   integer function idxS(iLon, j, nLon) result(i)
+!     implicit none
+!     integer, intent(in) :: iLon, j, nLon
+!     i = 2 * ( (j - 1) * nLon + (iLon - 1) ) + 2
+!   end function idxS
+
+!   ! hemisphere index
+!   integer function idxH(iLon, j, iHemi, nLon) result(i)
+!     implicit none
+!     integer, intent(in) :: iLon, j, iHemi, nLon
+!     select case(iHemi)
+!     case (NH)
+!       i = idxN(iLon, j, nLon)
+!     case (SH)
+!       i = idxS(iLon, j, nLon)
+!     end select
+!   end function idxH
+
+!   ! Inverse mapping: given 1D index i, recover iLon, j (latitude), hemisphere
+!   subroutine inv_idx(i, nLon, iLon, j, iHemi)
+!     implicit none
+!     integer, intent(in)  :: i, nLon
+!     integer, intent(out) :: iLon, j, iHemi
+!     integer :: k
+!     if (i < 1) stop 'inv_idx: index must be >= 1'
+!     ! cell number k = 1,2,3,...
+!     k = (i + 1) / 2 ! every pair of NH SH corresponds to one cell
+!     j    = (k - 1) / nLon + 1 ! which latitude row: all nLon cells corresponds to one latitude
+!     iLon = mod(k - 1, nLon) + 1 !  position within that latitude row (longitude index)
+!     if (mod(i, 2) == 1) then
+!       iHemi = NH ! odd index corresponds to NH
+!     else
+!       iHemi = SH ! even index corresponds to SH
+!     end if
+!   end subroutine inv_idx
+
+!   ! Periodic longitude wrap
+!   integer function wrap_lon(iLon, nLon) result(iw)
+!     implicit none
+!     integer, intent(in) :: iLon, nLon
+!     iw = iLon ! start with given longitude
+!     if (iw < 1)    iw = iw + nLon !wrap left edge to last longitude
+!     if (iw > nLon) iw = iw - nLon ! wrap right edge to first longitude
+!   end function wrap_lon
+
+!   ! Check if latitude index is valid
+!   logical function valid_lat(j, nLat) result(ok)
+!     implicit none
+!     integer, intent(in) :: j, nLat
+!     ok = (j >= 1 .and. j <= nLat) ! true if latitude index is inside valid range
+!   end function valid_lat
+
+!   ! One cell has both hemispheres
+!   integer function other_hemi(iHemi) result(jHemi)
+!     implicit none
+!     integer, intent(in) :: iHemi
+!     if (iHemi == NH) then
+!       jHemi = SH
+!     else if (iHemi == SH) then
+!       jHemi = NH
+!     end if
+!   end function other_hemi
+
+!   ! East neighbor
+!   ! Periodic longitude
+!   integer function E_idx(iLon, j, iHemi, nLon) result(i)
+!     implicit none
+!     integer, intent(in) :: iLon, j, iHemi, nLon
+!     i = idxH(wrap_lon(iLon + 1, nLon), j, iHemi, nLon)
+!   end function E_idx
+
+!   ! West neighbor
+!   ! Periodic longitude
+!   integer function W_idx(iLon, j, iHemi, nLon) result(i)
+!     implicit none
+!     integer, intent(in) :: iLon, j, iHemi, nLon
+!     i = idxH(wrap_lon(iLon - 1, nLon), j, iHemi, nLon)
+!   end function W_idx
+
+!   ! Poleward neighbor
+!   ! Returns -1 if invalid
+!   ! j = 1 is pole
+!   ! j = nLat is equator
+!   ! so poleward means j-1
+!   integer function N_idx(iLon, j, iHemi, nLon, nLat) result(i)
+!     implicit none
+!     integer, intent(in) :: iLon, j, iHemi, nLon, nLat
+!     integer :: jp
+!     jp = j - 1
+!     if (.not. valid_lat(jp, nLat)) then
+!       i = -1 ! return -1 at pole 
+!     else
+!       i = idxH(iLon, jp, iHemi, nLon)
+!     end if
+!   end function N_idx
+
+!   ! Equatorward neighbor
+!   ! Returns -1 if invalid
+!   !
+!   ! equatorward means j+1
+!   integer function S_idx(iLon, j, iHemi, nLon, nLat) result(i)
+!     implicit none
+!     integer, intent(in) :: iLon, j, iHemi, nLon, nLat
+!     integer :: jq
+
+!     jq = j + 1
+!     if (.not. valid_lat(jq, nLat)) then
+!       i = -1
+!     else
+!       i = idxH(iLon, jq, iHemi, nLon)
+!     end if
+!   end function S_idx
+
+!   ! East + poleward diagonal
+!   ! Returns -1 if invalid
+!   integer function NE_idx(iLon, j, iHemi, nLon, nLat) result(i)
+!     implicit none
+!     integer, intent(in) :: iLon, j, iHemi, nLon, nLat
+!     integer :: jp
+
+!     jp = j - 1
+!     if (.not. valid_lat(jp, nLat)) then
+!       i = -1
+!     else
+!       i = idxH(wrap_lon(iLon + 1, nLon), jp, iHemi, nLon)
+!     end if
+!   end function NE_idx
+
+!   ! West + poleward diagonal
+!   ! Returns -1 if invalid
+!   integer function NW_idx(iLon, j, iHemi, nLon, nLat) result(i)
+!     implicit none
+!     integer, intent(in) :: iLon, j, iHemi, nLon, nLat
+!     integer :: jp
+
+!     jp = j - 1
+!     if (.not. valid_lat(jp, nLat)) then
+!       i = -1
+!     else
+!       i = idxH(wrap_lon(iLon - 1, nLon), jp, iHemi, nLon)
+!     end if
+!   end function NW_idx
+
+!   ! East + equatorward diagonal
+!   ! Returns -1 if invalid
+!   integer function SE_idx(iLon, j, iHemi, nLon, nLat) result(i)
+!     implicit none
+!     integer, intent(in) :: iLon, j, iHemi, nLon, nLat
+!     integer :: jq
+!     jq = j + 1
+!     if (.not. valid_lat(jq, nLat)) then
+!       i = -1
+!     else
+!       i = idxH(wrap_lon(iLon + 1, nLon), jq, iHemi, nLon)
+!     end if
+!   end function SE_idx
+
+!   ! West + equatorward diagonal
+!   ! Returns -1 if invalid
+!   integer function SW_idx(iLon, j, iHemi, nLon, nLat) result(i)
+!     implicit none
+!     integer, intent(in) :: iLon, j, iHemi, nLon, nLat
+!     integer :: jq
+
+!     jq = j + 1
+!     if (.not. valid_lat(jq, nLat)) then
+!       i = -1
+!     else
+!       i = idxH(wrap_lon(iLon - 1, nLon), jq, iHemi, nLon)
+!     end if
+!   end function SW_idx
+
+! end module ModInterleavedIndexing
+!=======================================================================================================
+! Copyright 2021, the GITM Development Team (see srcDoc/dev_team.md for members)
+! Full license can be found in LICENSE
+module ModInterleavedIndexing
+  implicit none
+  private
+
+  ! Public symbols
+  public :: NH, SH, EQ
+  public :: idxN, idxS, idxH, idxEq
+  public :: inv_idx
+  public :: wrap_lon
+
+  integer, parameter :: NH = 1
+  integer, parameter :: SH = 2
+  integer, parameter :: EQ = 0
+
+contains
+
+  ! NH index at (iLon, j)
+  integer function idxN(iLon, j, nLon) result(i)
+    implicit none
+    integer, intent(in) :: iLon, j, nLon
+    i = 2 * ( (j - 1) * nLon + (iLon - 1) ) + 1
+  end function idxN
+
+  ! SH index at (iLon, j)
+  integer function idxS(iLon, j, nLon) result(i)
+    implicit none
+    integer, intent(in) :: iLon, j, nLon
+    i = 2 * ( (j - 1) * nLon + (iLon - 1) ) + 2
+  end function idxS
+
+  ! Equator index at (iLon)
+  ! Starts exactly after the last paired SH cell (2 * nLatH * nLon)
+  integer function idxEq(iLon, nLatH, nLon) result(i)
+    implicit none
+    integer, intent(in) :: iLon, nLatH, nLon
+    i = (2 * nLatH * nLon) + iLon
+  end function idxEq
+
+  ! Hemisphere/Equator router
+  integer function idxH(iLon, j, iHemi, nLatH, nLon) result(i)
+    implicit none
+    integer, intent(in) :: iLon, j, iHemi, nLatH, nLon
+    select case(iHemi)
+    case (NH)
+      i = idxN(iLon, j, nLon)
+    case (SH)
+      i = idxS(iLon, j, nLon)
+    case (EQ)
+      i = idxEq(iLon, nLatH, nLon)
+    end select
+  end function idxH
+
+  ! Inverse mapping: given 1D index i, recover iLon, j (latitude), hemisphere
+  subroutine inv_idx(i, nLon, nLatH, iLon, j, iHemi)
+    implicit none
+    integer, intent(in)  :: i, nLon, nLatH
+    integer, intent(out) :: iLon, j, iHemi
+    integer :: k, nPairs
+    
+    if (i < 1) stop 'inv_idx: index must be >= 1'
+    
+    nPairs = 2 * nLatH * nLon
+    
+    if (i <= nPairs) then
+      ! It is a paired NH/SH cell
+      k = (i + 1) / 2 
+      j    = (k - 1) / nLon + 1 
+      iLon = mod(k - 1, nLon) + 1 
+      if (mod(i, 2) == 1) then
+        iHemi = NH 
+      else
+        iHemi = SH 
+      end if
+    else
+      ! It is an Equator cell
+      iHemi = EQ
+      j = nLatH + 1
+      iLon = i - nPairs
+    end if
+  end subroutine inv_idx
+
+  ! Periodic longitude wrap
+  integer function wrap_lon(iLon, nLon) result(iw)
+    implicit none
+    integer, intent(in) :: iLon, nLon
+    iw = iLon 
+    if (iw < 1)    iw = iw + nLon 
+    if (iw > nLon) iw = iw - nLon 
+  end function wrap_lon
+
+end module ModInterleavedIndexing
+  !=======================================================================================================
+! OLD1
+! subroutine preconditioner
+!   use ModElectrodynamics
+!   use ModLinearSolver
+!   use ModInterleavedIndexing, only: NH, SH, idxN, idxS
+
+!   implicit none
+
+!   integer :: iLon, j, iN, iS, nX
+!   integer :: nLatH, jN, jS
+
+!   nLatH = nMagLats/2
+
+!   b    = 0.0
+!   rhs  = 0.0
+!   x    = 0.0
+!   d_I  = 0.0
+!   e_I  = 0.0
+!   f_I  = 0.0
+!   e1_I = 0.0
+!   f1_I = 0.0
+!   c_I  = 0.0
+
+!   do j = 1, nLatH
+!     do iLon = 1, nMagLons
+
+
+!       ! Map hemisphere-local row j to full-grid latitude indices
+!       ! NH: pole TO equator
+!       jN = nMagLats - j + 1
+
+!       ! SH: pole TO equator
+!       jS = j
+
+!       iN = idxN(iLon, j, nMagLons)
+!       iS = idxS(iLon, j, nMagLons)
+
+!       ! ---------------- NH row ----------------
+!       b(iN) = solver_s_mc(iLon, jN)
+!       x(iN) = DynamoPotentialMC(iLon, jN)
+
+!       d_I(iN)  = -2.0*(solver_a_mc(iLon, jN) + solver_b_mc(iLon, jN))
+!       e_I(iN)  =  solver_a_mc(iLon, jN) - solver_e_mc(iLon, jN)
+!       f_I(iN)  =  solver_a_mc(iLon, jN) + solver_e_mc(iLon, jN)
+!       e1_I(iN) =  solver_b_mc(iLon, jN) - solver_d_mc(iLon, jN)
+!       f1_I(iN) =  solver_b_mc(iLon, jN) + solver_d_mc(iLon, jN)
+!       c_I(iN)  =  solver_c_mc(iLon, jN)
+
+!       ! ---------------- SH row ----------------
+!       b(iS) = solver_s_mc(iLon, jS)
+!       x(iS) = DynamoPotentialMC(iLon, jS)
+
+!       d_I(iS)  = -2.0*(solver_a_mc(iLon, jS) + solver_b_mc(iLon, jS))
+!       e_I(iS)  =  solver_a_mc(iLon, jS) - solver_e_mc(iLon, jS)
+!       f_I(iS)  =  solver_a_mc(iLon, jS) + solver_e_mc(iLon, jS)
+!       e1_I(iS) =  solver_b_mc(iLon, jS) - solver_d_mc(iLon, jS)
+!       f1_I(iS) =  solver_b_mc(iLon, jS) + solver_d_mc(iLon, jS)
+!       c_I(iS)  =  solver_c_mc(iLon, jS)
+
+!     end do
+!   end do
+!   Rhs = b
+!     ! d_lu  = d_I
+!     ! e_lu  = e_I
+!     ! f_lu  = f_I
+!     ! e1_lu = e1_I
+!     ! f1_lu = f1_I
+!     ! nX = nMagLats * nMagLons
+!     ! call prehepta(nX, 1, nMagLons, nX, -0.5, d_lu, e_lu, f_lu, e1_lu, f1_lu)
+!     ! call Lhepta(nX, 1, nMagLons, nX, b, d_lu, e_lu, e1_lu)
+!     ! call Uhepta(.true., nX, 1, nMagLons, nX, b, f_lu, f1_lu)
+! end subroutine preconditioner
+!OLD2
+subroutine preconditioner
+  use ModElectrodynamics
+  use ModLinearSolver
+  use ModInterleavedIndexing, only: NH, SH, EQ, idxN, idxS, idxEq
+
+  implicit none
+
+  integer :: iLon, j, iN, iS, iEq, nX
+  integer :: nLatH, jN, jS, jEq
+
+  ! Number of latitudes in ONE hemisphere (excluding equator)
+  nLatH = nMagLats / 2
+  ! Latitude index of the equator row
+  jEq   = nLatH + 1
+
+  b    = 0.0
+  rhs  = 0.0
+  x    = 0.0
+  d_I  = 0.0
+  e_I  = 0.0
+  f_I  = 0.0
+  e1_I = 0.0
+  f1_I = 0.0
+  c_I  = 0.0
+
+  ! Fill the Paired Hemispheres
+  do j = 1, nLatH
+    do iLon = 1, nMagLons
+
+      ! Map hemisphere-local row j to full-grid latitude indices
+      jN = nMagLats - j + 1 ! NH: pole TO equator
+      jS = j                ! SH: pole TO equator
+
+      iN = idxN(iLon, j, nMagLons)
+      iS = idxS(iLon, j, nMagLons)
+
+      ! ---------------- NH row ----------------
+      b(iN) = solver_s_mc(iLon, jN)
+      x(iN) = DynamoPotentialMC(iLon, jN)
+
+      d_I(iN)  = -2.0*(solver_a_mc(iLon, jN) + solver_b_mc(iLon, jN))
+      e_I(iN)  =  solver_a_mc(iLon, jN) - solver_e_mc(iLon, jN)
+      f_I(iN)  =  solver_a_mc(iLon, jN) + solver_e_mc(iLon, jN)
+      e1_I(iN) =  solver_b_mc(iLon, jN) - solver_d_mc(iLon, jN)
+      f1_I(iN) =  solver_b_mc(iLon, jN) + solver_d_mc(iLon, jN)
+      c_I(iN)  =  solver_c_mc(iLon, jN)
+
+      ! ---------------- SH row ----------------
+      b(iS) = solver_s_mc(iLon, jS)
+      x(iS) = DynamoPotentialMC(iLon, jS)
+
+      d_I(iS)  = -2.0*(solver_a_mc(iLon, jS) + solver_b_mc(iLon, jS))
+      e_I(iS)  =  solver_a_mc(iLon, jS) - solver_e_mc(iLon, jS)
+      f_I(iS)  =  solver_a_mc(iLon, jS) + solver_e_mc(iLon, jS)
+      e1_I(iS) =  solver_b_mc(iLon, jS) - solver_d_mc(iLon, jS)
+      f1_I(iS) =  solver_b_mc(iLon, jS) + solver_d_mc(iLon, jS)
+      c_I(iS)  =  solver_c_mc(iLon, jS)
+
+    end do
+  end do
+
+  ! Fill the Equator Row
+  do iLon = 1, nMagLons
+    
+    iEq = idxEq(iLon, nLatH, nMagLons)
+
+    b(iEq) = solver_s_mc(iLon, jEq)
+    x(iEq) = DynamoPotentialMC(iLon, jEq)
+
+    d_I(iEq)  = -2.0*(solver_a_mc(iLon, jEq) + solver_b_mc(iLon, jEq))
+    e_I(iEq)  =  solver_a_mc(iLon, jEq) - solver_e_mc(iLon, jEq)
+    f_I(iEq)  =  solver_a_mc(iLon, jEq) + solver_e_mc(iLon, jEq)
+    e1_I(iEq) =  solver_b_mc(iLon, jEq) - solver_d_mc(iLon, jEq)
+    f1_I(iEq) =  solver_b_mc(iLon, jEq) + solver_d_mc(iLon, jEq)
+    c_I(iEq)  =  solver_c_mc(iLon, jEq)
+    
+  end do
+
+    Rhs = b
+    d_lu  = d_I
+    e_lu  = e_I
+    f_lu  = f_I
+    e1_lu = e1_I
+    f1_lu = f1_I
+    nX = nMagLats * nMagLons
+    call prehepta(nX, 1, nMagLons, nX, -0.5, d_lu, e_lu, f_lu, e1_lu, f1_lu)
+    call Lhepta(nX, 1, nMagLons, nX, b, d_lu, e_lu, e1_lu)
+    call Uhepta(.true., nX, 1, nMagLons, nX, b, f_lu, f1_lu)
+
+end subroutine preconditioner
+! OLD0
+! subroutine preconditioner
+!   use ModElectrodynamics
+!   use ModLinearSolver
+
+!   implicit none
+!   integer :: iLat, iLon, iI, nX
+!   iI = 0
+!   nX = (nMagLats - 2)*(nMagLons)
+!   b = 0.0
+!   d_I = 0.0
+!   e_I = 0.0
+!   f_I = 0.0 
+!   e1_I = 0.0
+!   f1_I = 0.0
+!   c_I = 0.0
+  
+  
+!  do iLat = 2, nMagLats-1
+!     do iLon = 1, nMagLons
+
+!       iI = iI + 1
+
+!       ! Right hand side
+!       b(iI) = solver_s_mc(iLon, iLat)
+
+!       ! Initial Guess
+!       x(iI) = DynamoPotentialMC(iLon, iLat)
+
+!       ! i,j
+!       d_I(iI) = -2*(solver_a_mc(iLon, iLat) + solver_b_mc(iLon, iLat))
+
+!       ! ilon-1, ilat
+!       e_I(iI) = solver_a_mc(iLon, iLat) - solver_e_mc(iLon, iLat)
+
+!       ! ilon+1, ilat
+!       f_I(iI) = solver_a_mc(iLon, iLat) + solver_e_mc(iLon, iLat)
+
+!       ! ilon, ilat-1
+!       e1_I(iI) = solver_b_mc(iLon, iLat) - solver_d_mc(iLon, iLat)
+
+!       ! ilon, ilat+1
+!       f1_I(iI) = solver_b_mc(iLon, iLat) + solver_d_mc(iLon, iLat)
+!       c_I(iI) = solver_c_mc(iLon, iLat)
+
+!       ! if (iLat == 2) then
+!       !   b(iI) = b(iI) - (solver_b_mc(iLon, iLat) - solver_d_mc(iLon, iLat))* &
+!       !           SmallPotentialMC(iLon, 1)
+!       !   e1_I(iI) = 0.0
+!       ! endif
+!       ! if (iLat == nMagLats - 1) then
+!       !   b(iI) = b(iI) - (solver_b_mc(iLon, iLat) + solver_d_mc(iLon, iLat))* &
+!       !           SmallPotentialMC(iLon, 2)
+!       !   f1_I(iI) = 0.0
+!       ! endif
+
+!     enddo
+!   enddo
+
+!     Rhs = b
+!     d_lu  = d_I
+!     e_lu  = e_I
+!     f_lu  = f_I
+!     e1_lu = e1_I
+!     f1_lu = f1_I
+
+!     call prehepta(nX, 1, nMagLons, nX, -0.5, d_lu, e_lu, f_lu, e1_lu, f1_lu)
+!     call Lhepta(nX, 1, nMagLons, nX, b, d_lu, e_lu, e1_lu)
+!     call Uhepta(.true., nX, 1, nMagLons, nX, b, f_lu, f1_lu)
+
+! end subroutine preconditioner
 
 subroutine UA_fill_electrodynamics(UAr2_fac, UAr2_ped, UAr2_hal, &
                                    UAr2_lats, UAr2_mlts)
@@ -31,6 +563,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   use ModMPI
   use ModTime
   use ModMagTrace
+  use ModInterleavedIndexing, only: idxN, idxS
 
   implicit none
 
@@ -41,6 +574,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   integer :: i, j, k, bs, iError, iBlock, iDir, iLon, iLat, iAlt, ip, im, iOff
 
   integer :: iEquator
+  integer :: jN, jS, iN, iS
 
   real :: GeoLat, GeoLon, GeoAlt, xAlt, len, ped, hal
   real :: sp_d1d1_d, sp_d2d2_d, sp_d1d2_d, sh
@@ -72,6 +606,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
   integer :: iLm, iLp, jLat, iI, MaxIteration, nIteration, iLonNoon
   integer :: nX
+  integer :: nTot
   integer :: iStart, iEnd, iAve
 
   logical :: UseNewTrace = .false.
@@ -211,7 +746,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
     do i = iStart, iEnd
       if (iDebugLevel > 1) &
-        write(*, *) "==> Calculating Apex->Geo", i, iStart, iEnd
+        write(*, *) "==> Calculating ApexTOGeo", i, iStart, iEnd
       do j = 1, nMagLats
 
         MagLatMC(i, j) = float(j - 1)*MagLatRes - DynamoHighLatBoundary
@@ -1391,13 +1926,29 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   DynamoPotentialMC = 0.0
 
   ! Fill in the diagonal vectors
-  iI = 0
+  ! iI = 0
 
-  nX = (nMagLats - 2)*(nMagLons)
+  ! nX = (nMagLats - 2)*(nMagLons)
 
-  allocate(x(nX), y(nX), rhs(nX), b(nX), &
-           d_I(nX), e_I(nX), e1_I(nX), f_I(nX), f1_I(nX))
+  ! allocate(x(nX), y(nX), rhs(nX), b(nX), &
+  !          d_I(nX), e_I(nX), e1_I(nX), f_I(nX), f1_I(nX), &
+  !          d_lu(nX), e_lu(nX), e1_lu(nX), f_lu(nX), f1_lu(nX), c_I(nX))
 
+  nTot = nMagLats*nMagLons
+
+if (allocated(x))    deallocate(x)
+if (allocated(y))    deallocate(y)
+if (allocated(rhs))  deallocate(rhs)
+if (allocated(b))    deallocate(b)
+if (allocated(d_I))  deallocate(d_I)
+if (allocated(e_I))  deallocate(e_I)
+if (allocated(e1_I)) deallocate(e1_I)
+if (allocated(f_I))  deallocate(f_I)
+if (allocated(f1_I)) deallocate(f1_I)
+if (allocated(c_I))  deallocate(c_I)
+
+allocate(x(nTot), y(nTot), rhs(nTot), b(nTot), &
+         d_I(nTot), e_I(nTot), e1_I(nTot), f_I(nTot), f1_I(nTot), c_I(nTot))
   ! call UA_SetnMLTs(nMagLons + 1)
   call ieModel_%nMlts(nMagLons + 1)
   call ieModel_%nLats(2)
@@ -1427,68 +1978,68 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     SmallPotentialMC = 0.0
   endif
 
-  do iLat = 2, nMagLats - 1
-    do iLon = 1, nMagLons
+  ! do iLat = 2, nMagLats - 1
+  !   do iLon = 1, nMagLons
 
-      iI = iI + 1
+  !     iI = iI + 1
 
-      ! Right hand side
-      b(iI) = solver_s_mc(iLon, iLat)
+  !     ! Right hand side
+  !     b(iI) = solver_s_mc(iLon, iLat)
 
-      ! Initial Guess
-      x(iI) = DynamoPotentialMC(iLon, iLat)
+  !     ! Initial Guess
+  !     x(iI) = DynamoPotentialMC(iLon, iLat)
 
-      ! i,j
-      d_I(iI) = -2*(solver_a_mc(iLon, iLat) + solver_b_mc(iLon, iLat))
+  !     ! i,j
+  !     d_I(iI) = -2*(solver_a_mc(iLon, iLat) + solver_b_mc(iLon, iLat))
 
-      ! ilon-1, ilat
-      e_I(iI) = solver_a_mc(iLon, iLat) - solver_e_mc(iLon, iLat)
+  !     ! ilon-1, ilat
+  !     e_I(iI) = solver_a_mc(iLon, iLat) - solver_e_mc(iLon, iLat)
 
-      ! ilon+1, ilat
-      f_I(iI) = solver_a_mc(iLon, iLat) + solver_e_mc(iLon, iLat)
+  !     ! ilon+1, ilat
+  !     f_I(iI) = solver_a_mc(iLon, iLat) + solver_e_mc(iLon, iLat)
 
-      ! ilon, ilat-1
-      e1_I(iI) = solver_b_mc(iLon, iLat) - solver_d_mc(iLon, iLat)
+  !     ! ilon, ilat-1
+  !     e1_I(iI) = solver_b_mc(iLon, iLat) - solver_d_mc(iLon, iLat)
 
-      ! ilon, ilat+1
-      f1_I(iI) = solver_b_mc(iLon, iLat) + solver_d_mc(iLon, iLat)
+  !     ! ilon, ilat+1
+  !     f1_I(iI) = solver_b_mc(iLon, iLat) + solver_d_mc(iLon, iLat)
 
-      if (iLat == 2) then
-        b(iI) = b(iI) - (solver_b_mc(iLon, iLat) - solver_d_mc(iLon, iLat))* &
-                SmallPotentialMC(iLon, 1)
-        e1_I(iI) = 0.0
-      endif
-      if (iLat == nMagLats - 1) then
-        b(iI) = b(iI) - (solver_b_mc(iLon, iLat) + solver_d_mc(iLon, iLat))* &
-                SmallPotentialMC(iLon, 2)
-        f1_I(iI) = 0.0
-      endif
+  !     if (iLat == 2) then
+  !       b(iI) = b(iI) - (solver_b_mc(iLon, iLat) - solver_d_mc(iLon, iLat))* &
+  !               SmallPotentialMC(iLon, 1)
+  !       e1_I(iI) = 0.0
+  !     endif
+  !     if (iLat == nMagLats - 1) then
+  !       b(iI) = b(iI) - (solver_b_mc(iLon, iLat) + solver_d_mc(iLon, iLat))* &
+  !               SmallPotentialMC(iLon, 2)
+  !       f1_I(iI) = 0.0
+  !     endif
 
-    enddo
-  enddo
-
+  !   enddo
+  ! enddo
+  call preconditioner()
   call start_timing("dynamo_solver")
 
-  Rhs = b
+  ! Rhs = b
 
-  !!!  write(*,*) "prehepta"
-  !!!  ! A -> LU
-  !!!
-  !!!  write(*,*) "pre : ", &
-  !!!       sum(b),sum(abs(b)),sum(x),sum(d_I),sum(e_I),sum(f_I),&
-  !!!       sum(e1_I),sum(f1_I)
-  !!!
-  call prehepta(nX, 1, nMagLons, nX, -0.5, d_I, e_I, f_I, e1_I, f1_I)
-  !!!
-  !!!  ! Left side preconditioning: U^{-1}.L^{-1}.A.x = U^{-1}.L^{-1}.rhs
-  !!!
-  !!!  ! rhs'=U^{-1}.L^{-1}.rhs
-  !!!  write(*,*) "Lhepta"
-  call Lhepta(nX, 1, nMagLons, nX, b, d_I, e_I, e1_I)
-  !!!  write(*,*) "Uhepta"
-  call Uhepta(.true., nX, 1, nMagLons, nX, b, f_I, f1_I)
+  ! !!!  write(*,*) "prehepta"
+  ! !!!  ! A TO LU
+  ! !!!
+  ! !!!  write(*,*) "pre : ", &
+  ! !!!       sum(b),sum(abs(b)),sum(x),sum(d_I),sum(e_I),sum(f_I),&
+  ! !!!       sum(e1_I),sum(f1_I)
+  ! !!!
+  ! call prehepta(nX, 1, nMagLons, nX, -0.5, d_I, e_I, f_I, e1_I, f1_I)
+  ! !!!
+  ! !!!  ! Left side preconditioning: U^{-1}.L^{-1}.A.x = U^{-1}.L^{-1}.rhs
+  ! !!!
+  ! !!!  ! rhs'=U^{-1}.L^{-1}.rhs
+  ! !!!  write(*,*) "Lhepta"
+  ! call Lhepta(nX, 1, nMagLons, nX, b, d_I, e_I, e1_I)
+  ! !!!  write(*,*) "Uhepta"
+  ! call Uhepta(.true., nX, 1, nMagLons, nX, b, f_I, f1_I)
 
-  MaxIteration = 200      !good enough
+  MaxIteration = 200      !good enough : 200
   nIteration = 0
   iError = 0
   if (iDebugLevel > 2) then
@@ -1499,21 +2050,41 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
   Residual = 1.0    !! Residual = 1.0 iterations required ~ 103
              !! with Residual=0.01,only 20 more iterations are required (~ 122)
-  call gmres(matvec_gitm, b, x, .true., nX, &
-             MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe)
+
+  ! call gmres(matvec_gitm, b, x, .true., nX, &
+  !            MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe)
+
+  call gmres(matvec_gitm, b, x, .false., nTot, &
+           MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe)
 
   call end_timing("dynamo_solver")
 
   if (iDebugLevel > 0) &
     write(*, *) "=> gmres : ", MaxIteration, Residual, nIteration, iError
 
-  iI = 0
-  do iLat = 2, nMagLats - 1
-    do iLon = 1, nMagLons
-      iI = iI + 1
-      DynamoPotentialMC(iLon, iLat) = x(iI)
-    enddo
-  enddo
+  ! iI = 0
+  ! do iLat = 2, nMagLats - 1
+  !   do iLon = 1, nMagLons
+  !     iI = iI + 1
+  !     DynamoPotentialMC(iLon, iLat) = x(iI)
+  !   enddo
+  ! enddo
+
+
+do j = 1, nMagLats/2
+  do iLon = 1, nMagLons
+    jN = nMagLats - j + 1
+    jS = j
+
+    iN = idxN(iLon, j, nMagLons)
+    iS = idxS(iLon, j, nMagLons)
+
+    DynamoPotentialMC(iLon, jN) = x(iN)
+    DynamoPotentialMC(iLon, jS) = x(iS)
+  end do
+end do
+
+DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :)
 
   DynamoPotentialMC(:, 1) = 0.0
   DynamoPotentialMC(:, nMagLats) = 0.0
@@ -1521,19 +2092,20 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   ! --------------------------------------------------------------------------
   ! This is mapping the northern hemisphere onto the southern hemisphere.
   ! Should we really be doing this????? -dw
-  OldPotMC = DynamoPotentialMC
+  ! OldPotMC = DynamoPotentialMC
 
-  do iLat = 2, nMagLats/2
-    do iLon = 1, nMagLons
-      iI = nMagLats - iLat + 1
-      DynamoPotentialMC(iLon, iLat) = OldPotMC(iLon, iI)
-    enddo
-  enddo
+  ! do iLat = 2, nMagLats/2
+  !   do iLon = 1, nMagLons
+  !     iI = nMagLats - iLat + 1
+  !     DynamoPotentialMC(iLon, iLat) = OldPotMC(iLon, iI)
+  !   enddo
+  ! enddo
   ! --------------------------------------------------------------------------
 
   DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :)
 
-  if (allocated(b)) deallocate(x, y, b, rhs, d_I, e_I, f_I, e1_I, f1_I)
+  if (allocated(b)) deallocate(x, y, b, rhs, d_I, e_I, f_I, e1_I, f1_I)!, &
+                               !d_lu, e_lu, e1_lu, f_lu, f1_lu, c_I) 
   ! Electric fields
 
   do j = 1, nMagLats
@@ -1831,77 +2403,338 @@ contains
 end subroutine UA_calc_electrodynamics
 
 !============================================================================
-subroutine matvec_gitm(x_I, y_I, n)
+! OLD0
+! subroutine matvec_gitm(x_I, y_I, n)
 
+!   use ModElectrodynamics
+!   use ModLinearsolver, ONLY: Uhepta, Lhepta
+
+!   implicit none
+
+!   ! Calculate y = A.x where A is the (pentadiagonal) matrix
+
+!   integer, intent(in) :: n          ! number of unknowns
+!   real, intent(in) :: x_I(n)        ! vector of unknowns
+!   real, intent(out):: y_I(n)        ! y = A.x
+!   integer :: iunit, istat, iI
+
+!   integer :: iLat, iLon, i, iLm, iLp
+!   real :: x_G(nMagLons + 1, nMagLats) ! 2D array with ghost cells
+!   !-------------------------------------------------------------------------
+
+!   ! Put 1D vector into 2D solution
+!   i = 0; 
+!   do iLat = 2, nMagLats - 1
+!     do iLon = 1, nMagLons
+!       i = i + 1
+!       x_G(iLon, iLat) = x_I(i)
+!     enddo
+!   enddo
+
+!   x_G(:, 1) = 0.0
+!   x_G(:, nMagLats) = 0.0
+
+!   ! Apply periodic boundary conditions in Psi direction
+!   x_G(nMagLons + 1, :) = x_G(1, :)
+
+!   i = 0; 
+!   !  write(*,*)'X_G dim:',nMagLons+1, nMagLats  
+
+!   do iLat = 2, nMagLats - 1
+!     do iLon = 1, nMagLons
+!       i = i + 1
+
+!       iLm = iLon - 1
+!       if (iLm == 0) iLm = nMagLons
+!       iLp = iLon + 1
+!       if (iLp == nMagLons + 1) iLp = 1
+!       ! y_I(i) = &
+!       !   -(2*solver_a_mc(iLon, iLat) + 2*solver_b_mc(iLon, iLat))* &
+!       !   x_G(iLon, iLat) + &
+!       !   (solver_a_mc(iLon, iLat) + solver_e_mc(iLon, iLat))* &
+!       !   x_G(iLp, iLat) + &
+!       !   (solver_b_mc(iLon, iLat) + solver_d_mc(iLon, iLat))* &
+!       !   x_G(iLon, iLat + 1) + &
+!       !   (solver_c_mc(iLon, iLat))* &
+!       !   x_G(iLp, iLat + 1) + &
+!       !   (-solver_c_mc(iLon, iLat))* &
+!       !   x_G(iLp, iLat - 1) + &
+!       !   (solver_a_mc(iLon, iLat) - solver_e_mc(iLon, iLat))* &
+!       !   x_G(iLm, iLat) + &
+!       !   (solver_b_mc(iLon, iLat) - solver_d_mc(iLon, iLat))* &
+!       !   x_G(iLon, iLat - 1) + &
+!       !   (-solver_c_mc(iLon, iLat))* &
+!       !   x_G(iLm, iLat + 1) + &
+!       !   (solver_c_mc(iLon, iLat))* &
+!       !   x_G(iLm, iLat - 1)
+
+!         y_I(i) = &
+!             d_I(i) * x_G(iLon, iLat) + &
+!             f_I(i) * x_G(iLp, iLat) + &
+!             f1_I(i) * x_G(iLon, iLat+1) + & 
+!             c_I(i) * x_G(iLp, iLat + 1) - &
+!             c_I(i) * x_G(iLp, iLat - 1)+ &
+!             e_I(i) * x_G(iLm, iLat) + &
+!             e1_I(i) * x_G(iLon, iLat - 1) + &
+!             (-c_I(i)) * x_G(iLm, iLat + 1) + &
+!             (c_I(i)) * x_G(iLm, iLat - 1) 
+  
+          
+!     enddo
+!   enddo
+
+  !!!  ! Preconditioning: y'= U^{-1}.L^{-1}.y
+!   call Lhepta(n, 1, nMagLons, n, y_I, d_lu, e_lu, e1_lu)
+!   call Uhepta(.true., n, 1, nMagLons, n, y_I, f_lu, f1_lu)
+!     ! iunit = 99
+!     ! open(unit=iunit, file='y_I_debug.txt', status='replace', iostat=istat)
+!     ! write(iunit, '(a)') '# iLon  iLat  MagLon  MagLat  y_I'
+!     ! iI = 0
+!     ! do iLat = 2, nMagLats - 1
+!     !   do iLon = 1, nMagLons
+!     !     iI = iI + 1
+!     !     write(iunit, '(2i6, 3e16.8)') iLon, iLat, &
+!     !           MagLonMC(iLon, iLat), MagLatMC(iLon, iLat), y_I(iI)
+!     !   enddo
+!     ! enddo
+!     ! close(iunit)
+
+! end subroutine matvec_gitm
+!OLD1
+! subroutine matvec_gitm(x_I, y_I, n)
+
+!   use ModElectrodynamics
+!   use ModInterleavedIndexing
+!   ! use ModInterleavedIndexing, only: NH, SH, idxH, E_idx, W_idx, &
+!   !                                   N_idx, S_idx, &
+!   !                                   NE_idx, NW_idx, &
+!   !                                   SE_idx, SW_idx, &
+!   !                                   other_hemi
+
+!   implicit none
+
+!   integer, intent(in) :: n
+!   real, intent(in)    :: x_I(n)
+!   real, intent(out)   :: y_I(n)
+
+!   integer :: nLatH
+!   integer :: iLon, j, iHemi
+!   integer :: iC, iE, iW, iP, iQ, iEP, iWP, iEQ, iWQ
+
+!   nLatH = nMagLats/2
+!   y_I   = 0.0
+
+!   do j = 1, nLatH
+!     do iLon = 1, nMagLons
+
+!       ! ---------------- NH ----------------
+!       iHemi = NH
+!       iC  = idxH(iLon, j, iHemi, nMagLons)
+!       iE  = E_idx(iLon, j, iHemi, nMagLons)
+!       iW  = W_idx(iLon, j, iHemi, nMagLons)
+!       iP  = N_idx(iLon, j, iHemi, nMagLons, nLatH)
+!       iEP = NE_idx(iLon, j, iHemi, nMagLons, nLatH)
+!       iWP = NW_idx(iLon, j, iHemi, nMagLons, nLatH)
+
+!       if (j == nLatH) then
+!         iQ = idxS(iLon, nLatH-1, nMagLons)
+!         iEQ = idxS(wrap_lon(iLon + 1, nMagLons), nLatH-1, nMagLons)
+!         iWQ = idxS(wrap_lon(iLon - 1, nMagLons), nLatH-1, nMagLons)
+!           if (iLon == 1) then
+!             print *, "NH: iLon, j, iHemi : ", iLon, j, iHemi
+!             print *, "iC, iE, iW, iP, iEP, iWP, iQ, iEQ, iWQ : ", &
+!                      iC, iE, iW, iP, iEP, iWP, iQ, iEQ, iWQ
+!           endif
+!       else
+!         iQ  = S_idx(iLon, j, iHemi, nMagLons, nLatH)
+!         iEQ = SE_idx(iLon, j, iHemi, nMagLons, nLatH)
+!         iWQ = SW_idx(iLon, j, iHemi, nMagLons, nLatH)
+!       endif
+!       ! if (j==2) then
+!       ! print *, "NH: iLon, j, iHemi : ", iLon, j, iHemi
+!       ! print *, "iC, iE, iW, iP, iQ, iEP, iWP, iEQ, iWQ : ", &
+!       !          iC, iE, iW, iP, iQ, iEP, iWP, iEQ, iWQ
+!       ! endif
+
+!       y_I(iC) = d_I(iC)*x_I(iC) + f_I(iC)*x_I(iE) + e_I(iC)*x_I(iW)
+
+!       if (iP  > 0) y_I(iC) = y_I(iC) + e1_I(iC)*x_I(iP)
+!       if (iQ  > 0) y_I(iC) = y_I(iC) + f1_I(iC)*x_I(iQ)
+!       if (iEP > 0) y_I(iC) = y_I(iC) - c_I(iC)*x_I(iEP)
+!       if (iWP > 0) y_I(iC) = y_I(iC) + c_I(iC)*x_I(iWP)
+!       if (iEQ > 0) y_I(iC) = y_I(iC) + c_I(iC)*x_I(iEQ)
+!       if (iWQ > 0) y_I(iC) = y_I(iC) - c_I(iC)*x_I(iWQ)
+
+!       ! ---------------- SH ----------------
+!       iHemi = SH
+!       iC  = idxH(iLon, j, iHemi, nMagLons)
+!       iE  = E_idx(iLon, j, iHemi, nMagLons)
+!       iW  = W_idx(iLon, j, iHemi, nMagLons)
+!       iP  = N_idx(iLon, j, iHemi, nMagLons, nLatH)
+!       iQ  = S_idx(iLon, j, iHemi, nMagLons, nLatH)
+!       iEP = NE_idx(iLon, j, iHemi, nMagLons, nLatH)
+!       iWP = NW_idx(iLon, j, iHemi, nMagLons, nLatH)
+!       iEQ = SE_idx(iLon, j, iHemi, nMagLons, nLatH)
+!       iWQ = SW_idx(iLon, j, iHemi, nMagLons, nLatH)
+!       ! if (j==2) then
+!       !   print *, "SH: iLon, j, iHemi : ", iLon, j, iHemi
+!       !   print *, "iC, iE, iW, iP, iQ, iEP, iWP, iEQ, iWQ : ", &
+!       !           iC, iE, iW, iP, iQ, iEP, iWP, iEQ, iWQ
+!       ! endif
+
+!       y_I(iC) = d_I(iC)*x_I(iC) + f_I(iC)*x_I(iE) + e_I(iC)*x_I(iW)
+
+!       if (iP  > 0) y_I(iC) = y_I(iC) + e1_I(iC)*x_I(iP)
+!       if (iQ  > 0) y_I(iC) = y_I(iC) + f1_I(iC)*x_I(iQ)
+!       if (iEP > 0) y_I(iC) = y_I(iC) - c_I(iC)*x_I(iEP)
+!       if (iWP > 0) y_I(iC) = y_I(iC) + c_I(iC)*x_I(iWP)
+!       if (iEQ > 0) y_I(iC) = y_I(iC) + c_I(iC)*x_I(iEQ)
+!       if (iWQ > 0) y_I(iC) = y_I(iC) - c_I(iC)*x_I(iWQ)
+
+!     end do
+!   end do
+
+! end subroutine matvec_gitm
+!OLD2
+subroutine matvec_gitm(x_I, y_I, n)
   use ModElectrodynamics
-  use ModLinearsolver, ONLY: Uhepta, Lhepta
+  use ModInterleavedIndexing
+  use ModLinearSolver
 
   implicit none
 
-  ! Calculate y = A.x where A is the (pentadiagonal) matrix
+  integer, intent(in) :: n
+  real, intent(in)    :: x_I(n)
+  real, intent(out)   :: y_I(n)
 
-  integer, intent(in) :: n          ! number of unknowns
-  real, intent(in) :: x_I(n)        ! vector of unknowns
-  real, intent(out):: y_I(n)        ! y = A.x
+  integer :: nLatH
+  integer :: iLon, j
+  integer :: iC, iE, iW, iP, iQ, iEP, iWP, iEQ, iWQ
 
-  integer :: iLat, iLon, i, iLm, iLp
-  real :: x_G(nMagLons + 1, nMagLats) ! 2D array with ghost cells
-  !-------------------------------------------------------------------------
+  nLatH = nMagLats / 2
+  y_I   = 0.0
 
-  ! Put 1D vector into 2D solution
-  i = 0; 
-  do iLat = 2, nMagLats - 1
+  ! ====================================================
+  ! 1. PAIRED HEMISPHERES LOOP
+  ! ====================================================
+  do j = 1, nLatH
     do iLon = 1, nMagLons
-      i = i + 1
-      x_G(iLon, iLat) = x_I(i)
-    enddo
-  enddo
 
-  x_G(:, 1) = 0.0
-  x_G(:, nMagLats) = 0.0
+      ! ---------------- NH ----------------
+      iC = idxN(iLon, j, nMagLons)
+      iE = idxN(wrap_lon(iLon + 1, nMagLons), j, nMagLons)
+      iW = idxN(wrap_lon(iLon - 1, nMagLons), j, nMagLons)
 
-  ! Apply periodic boundary conditions in Psi direction
-  x_G(nMagLons + 1, :) = x_G(1, :)
+      if (j == 1) then
+        iP = -1 ! Pole
+        iEP = -1
+        iWP = -1
+      else
+        iP  = idxN(iLon, j - 1, nMagLons)
+        iEP = idxN(wrap_lon(iLon + 1, nMagLons), j - 1, nMagLons)
+        iWP = idxN(wrap_lon(iLon - 1, nMagLons), j - 1, nMagLons)
+      endif
 
-  i = 0; 
-  !  write(*,*)'X_G dim:',nMagLons+1, nMagLats
+      if (j == nLatH) then
+        ! Link Equatorward to the single Equator row
+        iQ  = idxEq(iLon, nLatH, nMagLons)
+        iEQ = idxEq(wrap_lon(iLon + 1, nMagLons), nLatH, nMagLons)
+        iWQ = idxEq(wrap_lon(iLon - 1, nMagLons), nLatH, nMagLons)
+      else
+        iQ  = idxN(iLon, j + 1, nMagLons)
+        iEQ = idxN(wrap_lon(iLon + 1, nMagLons), j + 1, nMagLons)
+        iWQ = idxN(wrap_lon(iLon - 1, nMagLons), j + 1, nMagLons)
+      endif
 
-  do iLat = 2, nMagLats - 1
-    do iLon = 1, nMagLons
-      i = i + 1
+      y_I(iC) = d_I(iC)*x_I(iC) + f_I(iC)*x_I(iE) + e_I(iC)*x_I(iW)
 
-      iLm = iLon - 1
-      if (iLm == 0) iLm = nMagLons
-      iLp = iLon + 1
-      if (iLp == nMagLons + 1) iLp = 1
-      y_I(i) = &
-        -(2*solver_a_mc(iLon, iLat) + 2*solver_b_mc(iLon, iLat))* &
-        x_G(iLon, iLat) + &
-        (solver_a_mc(iLon, iLat) + solver_e_mc(iLon, iLat))* &
-        x_G(iLp, iLat) + &
-        (solver_b_mc(iLon, iLat) + solver_d_mc(iLon, iLat))* &
-        x_G(iLon, iLat + 1) + &
-        (solver_c_mc(iLon, iLat))* &
-        x_G(iLp, iLat + 1) + &
-        (-solver_c_mc(iLon, iLat))* &
-        x_G(iLp, iLat - 1) + &
-        (solver_a_mc(iLon, iLat) - solver_e_mc(iLon, iLat))* &
-        x_G(iLm, iLat) + &
-        (solver_b_mc(iLon, iLat) - solver_d_mc(iLon, iLat))* &
-        x_G(iLon, iLat - 1) + &
-        (-solver_c_mc(iLon, iLat))* &
-        x_G(iLm, iLat + 1) + &
-        (solver_c_mc(iLon, iLat))* &
-        x_G(iLm, iLat - 1)
-    enddo
-  enddo
+      ! In NH, Poleward (P) is North (+iLat), uses f1_I. 
+      ! Equatorward (Q) is South (-iLat), uses e1_I.
+      if (iP > 0) y_I(iC) = y_I(iC) + f1_I(iC)*x_I(iP)
+      if (iQ > 0) y_I(iC) = y_I(iC) + e1_I(iC)*x_I(iQ)
+      
+      ! Diagonal signs flipped due to backward j index
+      if (iEP > 0) y_I(iC) = y_I(iC) + c_I(iC)*x_I(iEP)
+      if (iWP > 0) y_I(iC) = y_I(iC) - c_I(iC)*x_I(iWP)
+      if (iEQ > 0) y_I(iC) = y_I(iC) - c_I(iC)*x_I(iEQ)
+      if (iWQ > 0) y_I(iC) = y_I(iC) + c_I(iC)*x_I(iWQ)
 
-  !!!  ! Preconditioning: y'= U^{-1}.L^{-1}.y
-  call Lhepta(n, 1, nMagLons, n, y_I, d_I, e_I, e1_I)
-  call Uhepta(.true., n, 1, nMagLons, n, y_I, f_I, f1_I)
+      ! ---------------- SH ----------------
+      iC = idxS(iLon, j, nMagLons)
+      iE = idxS(wrap_lon(iLon + 1, nMagLons), j, nMagLons)
+      iW = idxS(wrap_lon(iLon - 1, nMagLons), j, nMagLons)
 
+      if (j == 1) then
+        iP = -1 ! Pole
+        iEP = -1
+        iWP = -1
+      else
+        iP  = idxS(iLon, j - 1, nMagLons)
+        iEP = idxS(wrap_lon(iLon + 1, nMagLons), j - 1, nMagLons)
+        iWP = idxS(wrap_lon(iLon - 1, nMagLons), j - 1, nMagLons)
+      endif
+
+      if (j == nLatH) then
+        ! Link Equatorward to the single Equator row
+        iQ  = idxEq(iLon, nLatH, nMagLons)
+        iEQ = idxEq(wrap_lon(iLon + 1, nMagLons), nLatH, nMagLons)
+        iWQ = idxEq(wrap_lon(iLon - 1, nMagLons), nLatH, nMagLons)
+      else
+        iQ  = idxS(iLon, j + 1, nMagLons)
+        iEQ = idxS(wrap_lon(iLon + 1, nMagLons), j + 1, nMagLons)
+        iWQ = idxS(wrap_lon(iLon - 1, nMagLons), j + 1, nMagLons)
+      endif
+
+      y_I(iC) = d_I(iC)*x_I(iC) + f_I(iC)*x_I(iE) + e_I(iC)*x_I(iW)
+
+      ! In SH, Poleward (P) is South (-iLat), uses e1_I. 
+      ! Equatorward (Q) is North (+iLat), uses f1_I.
+      if (iP > 0) y_I(iC) = y_I(iC) + e1_I(iC)*x_I(iP)
+      if (iQ > 0) y_I(iC) = y_I(iC) + f1_I(iC)*x_I(iQ)
+      
+      ! Original diagonal signs
+      if (iEP > 0) y_I(iC) = y_I(iC) - c_I(iC)*x_I(iEP)
+      if (iWP > 0) y_I(iC) = y_I(iC) + c_I(iC)*x_I(iWP)
+      if (iEQ > 0) y_I(iC) = y_I(iC) + c_I(iC)*x_I(iEQ)
+      if (iWQ > 0) y_I(iC) = y_I(iC) - c_I(iC)*x_I(iWQ)
+
+    end do
+  end do
+
+  ! ====================================================
+  ! 2. SHARED EQUATOR ROW LOOP
+  ! ====================================================
+  do iLon = 1, nMagLons
+    
+    iC = idxEq(iLon, nLatH, nMagLons)
+    iE = idxEq(wrap_lon(iLon + 1, nMagLons), nLatH, nMagLons)
+    iW = idxEq(wrap_lon(iLon - 1, nMagLons), nLatH, nMagLons)
+
+    ! At Equator, North is the last NH cell (j = nLatH)
+    iP  = idxN(iLon, nLatH, nMagLons)
+    iEP = idxN(wrap_lon(iLon + 1, nMagLons), nLatH, nMagLons)
+    iWP = idxN(wrap_lon(iLon - 1, nMagLons), nLatH, nMagLons)
+
+    ! At Equator, South is the last SH cell (j = nLatH)
+    iQ  = idxS(iLon, nLatH, nMagLons)
+    iEQ = idxS(wrap_lon(iLon + 1, nMagLons), nLatH, nMagLons)
+    iWQ = idxS(wrap_lon(iLon - 1, nMagLons), nLatH, nMagLons)
+
+    y_I(iC) = d_I(iC)*x_I(iC) + f_I(iC)*x_I(iE) + e_I(iC)*x_I(iW)
+
+    ! Standard iLat coefficients at the equator
+    y_I(iC) = y_I(iC) + f1_I(iC)*x_I(iP) ! North
+    y_I(iC) = y_I(iC) + e1_I(iC)*x_I(iQ) ! South
+    
+    y_I(iC) = y_I(iC) + c_I(iC)*x_I(iEP)  ! NE
+    y_I(iC) = y_I(iC) - c_I(iC)*x_I(iWP)  ! NW
+    y_I(iC) = y_I(iC) - c_I(iC)*x_I(iEQ)  ! SE
+    y_I(iC) = y_I(iC) + c_I(iC)*x_I(iWQ)  ! SW
+
+  end do
+call Lhepta(n, 1, nMagLons, n, y_I, d_lu, e_lu, e1_lu)
+call Uhepta(.true., n, 1, nMagLons, n, y_I, f_lu, f1_lu)
 end subroutine matvec_gitm
-
 subroutine UA_calc_electrodynamics_1d
 
   use ModGITM
