@@ -150,6 +150,24 @@ subroutine preconditioner
       f1_I(iS) =  solver_b_mc(iLon, jS) + solver_d_mc(iLon, jS)
       c_I(iS)  =  solver_c_mc(iLon, jS)
 
+      ! Apply to the cells adjacent to the poles
+      if (j == 2) then
+        ! SH Boundary (equivalent to old iLat == 2)
+        b(iS) = b(iS) - (solver_b_mc(iLon, jS) - solver_d_mc(iLon, jS)) * SmallPotentialMC(iLon, 1)
+        e1_I(iS) = 0.0
+
+        ! NH Boundary (equivalent to old iLat == nMagLats - 1)
+        b(iN) = b(iN) - (solver_b_mc(iLon, jN) + solver_d_mc(iLon, jN)) * SmallPotentialMC(iLon, 2)
+        f1_I(iN) = 0.0
+      end if
+
+      ! Lock the actual poles (j == 1) to an Identity equation (1 * x = 0)
+      ! This prevents them from ruining GMRES convergence or interacting with the active grid.
+      if (j == 1) then
+        b(iN) = 0.0; d_I(iN) = 1.0; e_I(iN) = 0.0; f_I(iN) = 0.0; e1_I(iN) = 0.0; f1_I(iN) = 0.0; c_I(iN) = 0.0
+        b(iS) = 0.0; d_I(iS) = 1.0; e_I(iS) = 0.0; f_I(iS) = 0.0; e1_I(iS) = 0.0; f1_I(iS) = 0.0; c_I(iS) = 0.0
+      end if
+
     end do
   end do
 
@@ -214,7 +232,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   use ModMPI
   use ModTime
   use ModMagTrace
-  use ModInterleavedIndexing, only: idxN, idxS
+  use ModInterleavedIndexing, only: idxN, idxS, idxEq
 
   implicit none
 
@@ -225,7 +243,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   integer :: i, j, k, bs, iError, iBlock, iDir, iLon, iLat, iAlt, ip, im, iOff
 
   integer :: iEquator
-  integer :: jN, jS, iN, iS
+  integer :: jN, jS, iN, iS, jEq, iEq
 
   real :: GeoLat, GeoLon, GeoAlt, xAlt, len, ped, hal
   real :: sp_d1d1_d, sp_d2d2_d, sp_d1d2_d, sh
@@ -397,7 +415,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
     do i = iStart, iEnd
       if (iDebugLevel > 1) &
-        write(*, *) "==> Calculating ApexTOGeo", i, iStart, iEnd
+        write(*, *) "==> Calculating Apex->Geo", i, iStart, iEnd
       do j = 1, nMagLats
 
         MagLatMC(i, j) = float(j - 1)*MagLatRes - DynamoHighLatBoundary
@@ -1656,40 +1674,37 @@ allocate(x(nTot), y(nTot), rhs(nTot), b(nTot), &
   ! enddo
 
 
-do j = 1, nMagLats/2
-  do iLon = 1, nMagLons
-    jN = nMagLats - j + 1
-    jS = j
+! Put 1D vector into 2D solution
+  
+  ! Unpack active Paired Hemispheres (skip j=1 poles)
+  do j = 2, nMagLats/2
+    do iLon = 1, nMagLons
+      jN = nMagLats - j + 1
+      jS = j
 
-    iN = idxN(iLon, j, nMagLons)
-    iS = idxS(iLon, j, nMagLons)
+      iN = idxN(iLon, j, nMagLons)
+      iS = idxS(iLon, j, nMagLons)
 
-    DynamoPotentialMC(iLon, jN) = x(iN)
-    DynamoPotentialMC(iLon, jS) = x(iS)
+      DynamoPotentialMC(iLon, jN) = x(iN)
+      DynamoPotentialMC(iLon, jS) = x(iS)
+    end do
   end do
-end do
 
-DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :)
+  ! Unpack the Equator
+  jEq = nMagLats/2 + 1
+  do iLon = 1, nMagLons
+    iEq = idxEq(iLon, nMagLats/2, nMagLons)
+    DynamoPotentialMC(iLon, jEq) = x(iEq)
+  end do
 
+  ! Apply explicit zero boundaries at the poles
   DynamoPotentialMC(:, 1) = 0.0
   DynamoPotentialMC(:, nMagLats) = 0.0
 
-  ! --------------------------------------------------------------------------
-  ! This is mapping the northern hemisphere onto the southern hemisphere.
-  ! Should we really be doing this????? -dw
-  ! OldPotMC = DynamoPotentialMC
-
-  ! do iLat = 2, nMagLats/2
-  !   do iLon = 1, nMagLons
-  !     iI = nMagLats - iLat + 1
-  !     DynamoPotentialMC(iLon, iLat) = OldPotMC(iLon, iI)
-  !   enddo
-  ! enddo
-  ! --------------------------------------------------------------------------
-
+  ! Apply periodic boundary conditions in Longitude 
   DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :)
 
-  if (allocated(b)) deallocate(x, y, b, rhs, d_I, e_I, f_I, e1_I, f1_I)!, &
+  if (allocated(b)) deallocate(x, y, b, rhs, d_I, e_I, f_I, e1_I, f1_I,c_I)!, &
                                !d_lu, e_lu, e1_lu, f_lu, f1_lu, c_I) 
   ! Electric fields
 
@@ -2009,6 +2024,15 @@ subroutine matvec_gitm(x_I, y_I, n)
   ! PAIRED HEMISPHERES LOOP
   do j = 1, nLatH
     do iLon = 1, nMagLons
+      ! ! --- POLE BOUNDARY CONDITION ---
+      ! ! Equivalent to old x_G(:, 1) = 0.0 and x_G(:, nMagLats) = 0.0
+      if (j == 1) then
+        ! The matrix equation for the poles is an Identity mapping: 1 * x = 0
+        y_I(idxN(iLon, j, nMagLons)) = x_I(idxN(iLon, j, nMagLons))
+        y_I(idxS(iLon, j, nMagLons)) = x_I(idxS(iLon, j, nMagLons))
+        ! Skip the rest of the 9-point stencil for the poles
+        cycle
+      end if
 
       ! ---------------- NH ----------------
       iC = idxN(iLon, j, nMagLons)
@@ -2044,10 +2068,10 @@ subroutine matvec_gitm(x_I, y_I, n)
       if (iQ > 0) y_I(iC) = y_I(iC) + e1_I(iC)*x_I(iQ)
       
       ! Diagonal signs flipped due to backward j index
-      if (iEP > 0) y_I(iC) = y_I(iC) + c_I(iC)*x_I(iEP)
-      if (iWP > 0) y_I(iC) = y_I(iC) - c_I(iC)*x_I(iWP)
-      if (iEQ > 0) y_I(iC) = y_I(iC) - c_I(iC)*x_I(iEQ)
-      if (iWQ > 0) y_I(iC) = y_I(iC) + c_I(iC)*x_I(iWQ)
+      if (iEP > 0) y_I(iC) = y_I(iC) - c_I(iC)*x_I(iEP)
+      if (iWP > 0) y_I(iC) = y_I(iC) + c_I(iC)*x_I(iWP)
+      if (iEQ > 0) y_I(iC) = y_I(iC) + c_I(iC)*x_I(iEQ)
+      if (iWQ > 0) y_I(iC) = y_I(iC) - c_I(iC)*x_I(iWQ)
 
       ! ---------------- SH ----------------
       iC = idxS(iLon, j, nMagLons)
@@ -2079,8 +2103,8 @@ subroutine matvec_gitm(x_I, y_I, n)
 
       ! In SH, Poleward (P) is South (-iLat), uses e1_I. 
       ! Equatorward (Q) is North (+iLat), uses f1_I.
-      if (iP > 0) y_I(iC) = y_I(iC) + e1_I(iC)*x_I(iP)
-      if (iQ > 0) y_I(iC) = y_I(iC) + f1_I(iC)*x_I(iQ)
+      if (iP > 0) y_I(iC) = y_I(iC) + f1_I(iC)*x_I(iP)
+      if (iQ > 0) y_I(iC) = y_I(iC) + e1_I(iC)*x_I(iQ)
       
       ! Original diagonal signs
       if (iEP > 0) y_I(iC) = y_I(iC) - c_I(iC)*x_I(iEP)
@@ -2114,15 +2138,16 @@ subroutine matvec_gitm(x_I, y_I, n)
     y_I(iC) = y_I(iC) + f1_I(iC)*x_I(iP) ! North
     y_I(iC) = y_I(iC) + e1_I(iC)*x_I(iQ) ! South
     
-    y_I(iC) = y_I(iC) + c_I(iC)*x_I(iEP)  ! NE
-    y_I(iC) = y_I(iC) - c_I(iC)*x_I(iWP)  ! NW
-    y_I(iC) = y_I(iC) - c_I(iC)*x_I(iEQ)  ! SE
-    y_I(iC) = y_I(iC) + c_I(iC)*x_I(iWQ)  ! SW
+    y_I(iC) = y_I(iC) - c_I(iC)*x_I(iEP)  ! NE
+    y_I(iC) = y_I(iC) + c_I(iC)*x_I(iWP)  ! NW
+    y_I(iC) = y_I(iC) + c_I(iC)*x_I(iEQ)  ! SE
+    y_I(iC) = y_I(iC) - c_I(iC)*x_I(iWQ)  ! SW
 
   end do
 call Lhepta(n, 1, nMagLons, n, y_I, d_lu, e_lu, e1_lu)
 call Uhepta(.true., n, 1, nMagLons, n, y_I, f_lu, f1_lu)
 end subroutine matvec_gitm
+!=================================================================================
 subroutine UA_calc_electrodynamics_1d
 
   use ModGITM
