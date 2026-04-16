@@ -6,7 +6,7 @@ module ModInterleavedIndexing
 
   ! Public symbols
   public :: NH, SH, EQ
-  public :: idxN, idxS, idxH, idxEq
+  public :: idxN, idxS, idxEq
   public :: inv_idx
   public :: wrap_lon
 
@@ -37,20 +37,6 @@ contains
     integer, intent(in) :: iLon, nLatH, nLon
     i = (2 * nLatH * nLon) + iLon
   end function idxEq
-
-  ! Hemisphere/Equator router
-  integer function idxH(iLon, j, iHemi, nLatH, nLon) result(i)
-    implicit none
-    integer, intent(in) :: iLon, j, iHemi, nLatH, nLon
-    select case(iHemi)
-    case (NH)
-      i = idxN(iLon, j, nLon)
-    case (SH)
-      i = idxS(iLon, j, nLon)
-    case (EQ)
-      i = idxEq(iLon, nLatH, nLon)
-    end select
-  end function idxH
 
   ! Inverse mapping: given 1D index i, recover iLon, j (latitude), hemisphere
   subroutine inv_idx(i, nLon, nLatH, iLon, j, iHemi)
@@ -100,7 +86,7 @@ subroutine preconditioner
   implicit none
 
   integer :: iLon, j, iN, iS, iEq, nX
-  integer :: nLatH, jN, jS, jEq, i
+  integer :: nLatH, jN, jS, jEq, ind
   real, allocatable, save :: temp_orig(:)
 
   ! Number of latitudes in ONE hemisphere (excluding equator)
@@ -192,18 +178,14 @@ subroutine preconditioner
   
   do j = 1, nMagLats
     do iLon = 1, nMagLons
-      i = (j - 1) * nMagLons + iLon  !  index
+      ind = (j - 1) * nMagLons + iLon  !  index
       
-      d_lu(i)  = -2.0*(solver_a_mc(iLon, j) + solver_b_mc(iLon, j))
-      e_lu(i)  =  solver_a_mc(iLon, j) - solver_e_mc(iLon, j)
-      f_lu(i)  =  solver_a_mc(iLon, j) + solver_e_mc(iLon, j)
-      e1_lu(i) =  solver_b_mc(iLon, j) - solver_d_mc(iLon, j)
-      f1_lu(i) =  solver_b_mc(iLon, j) + solver_d_mc(iLon, j)
+      d_lu(ind)  = -2.0*(solver_a_mc(iLon, j) + solver_b_mc(iLon, j))
+      e_lu(ind)  =  solver_a_mc(iLon, j) - solver_e_mc(iLon, j)
+      f_lu(ind)  =  solver_a_mc(iLon, j) + solver_e_mc(iLon, j)
+      e1_lu(ind) =  solver_b_mc(iLon, j) - solver_d_mc(iLon, j)
+      f1_lu(ind) =  solver_b_mc(iLon, j) + solver_d_mc(iLon, j)
 
-      ! Protect prehepta from dividing by zero at the poles
-      if (j == 1 .or. j == nMagLats) then
-        d_lu(i) = 1.0; e_lu(i) = 0.0; f_lu(i) = 0.0; e1_lu(i) = 0.0; f1_lu(i) = 0.0
-      end if
     end do
   end do
 
@@ -211,10 +193,6 @@ subroutine preconditioner
 
   ! APPLY PRECONDITIONER TO 'b' USING A TEMPORARY MAPPING
   if (.not. allocated(temp_orig)) allocate(temp_orig(nX))
-  if (size(temp_orig) /= nX) then
-    deallocate(temp_orig)
-    allocate(temp_orig(nX))
-  end if
   
   ! Map interleaved 'b' to 'temp_orig'
   do j = 1, nLatH
@@ -1641,25 +1619,6 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   ! Fill in the diagonal vectors
   nTot = nMagLats*nMagLons
 
-if (allocated(x))    deallocate(x)
-if (allocated(y))    deallocate(y)
-if (allocated(rhs))  deallocate(rhs)
-if (allocated(b))    deallocate(b)
-if (allocated(d_I))  deallocate(d_I)
-if (allocated(e_I))  deallocate(e_I)
-if (allocated(e1_I)) deallocate(e1_I)
-if (allocated(f_I))  deallocate(f_I)
-if (allocated(f1_I)) deallocate(f1_I)
-if (allocated(c_I))  deallocate(c_I)
-
-if (allocated(d_lu))  deallocate(d_lu)
-if (allocated(e_lu))  deallocate(e_lu)
-if (allocated(f_lu))  deallocate(f_lu)
-if (allocated(e1_lu)) deallocate(e1_lu)
-if (allocated(f1_lu)) deallocate(f1_lu)
-
-if (allocated(d_lu)) deallocate(d_lu, e_lu, f_lu, e1_lu, f1_lu)
-
 allocate(x(nTot), y(nTot), rhs(nTot), b(nTot), &
          d_I(nTot), e_I(nTot), e1_I(nTot), f_I(nTot), f1_I(nTot), c_I(nTot), &
          d_lu(nTot), e_lu(nTot), f_lu(nTot), e1_lu(nTot), f1_lu(nTot))
@@ -2092,15 +2051,9 @@ subroutine matvec_gitm(x_I, y_I, n)
       iE = idxN(wrap_lon(iLon + 1, nMagLons), j, nMagLons)
       iW = idxN(wrap_lon(iLon - 1, nMagLons), j, nMagLons)
 
-      ! if (j == 1) then
-      !   iP = -1 ! Pole
-      !   iEP = -1
-      !   iWP = -1
-      ! else
       iP  = idxN(iLon, j - 1, nMagLons)
       iEP = idxN(wrap_lon(iLon + 1, nMagLons), j - 1, nMagLons)
       iWP = idxN(wrap_lon(iLon - 1, nMagLons), j - 1, nMagLons)
-      ! endif
 
       if (j == nLatH) then
         iQ  = idxEq(iLon, nLatH, nMagLons)
@@ -2127,15 +2080,9 @@ subroutine matvec_gitm(x_I, y_I, n)
       iE = idxS(wrap_lon(iLon + 1, nMagLons), j, nMagLons)
       iW = idxS(wrap_lon(iLon - 1, nMagLons), j, nMagLons)
 
-      ! if (j == 1) then
-      !   iP = -1 ! Pole
-      !   iEP = -1
-      !   iWP = -1
-      ! else
         iP  = idxS(iLon, j - 1, nMagLons)
         iEP = idxS(wrap_lon(iLon + 1, nMagLons), j - 1, nMagLons)
         iWP = idxS(wrap_lon(iLon - 1, nMagLons), j - 1, nMagLons)
-      ! endif
 
       if (j == nLatH) then
         iQ  = idxEq(iLon, nLatH, nMagLons)
@@ -2188,10 +2135,6 @@ subroutine matvec_gitm(x_I, y_I, n)
   ! APPLY PRECONDITIONER TO 'y_I' USING A TEMPORARY MAPPING
   
   if (.not. allocated(temp_orig)) allocate(temp_orig(n))
-  if (size(temp_orig) /= n) then
-    deallocate(temp_orig)
-    allocate(temp_orig(n))
-  end if
     
     ! Map interleaved 'y_I' to 'temp_orig'
     do j = 1, nLatH
