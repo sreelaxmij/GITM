@@ -173,7 +173,7 @@ subroutine preconditioner
   Rhs = b
   nX = nMagLats * nMagLons
 
-  ! BUILD PRECONDITIONER IN original ORDER
+  ! BUILD PRECONDITIONER IN ORIGINAL ORDER
   d_lu = 0.0; e_lu = 0.0; f_lu = 0.0; e1_lu = 0.0; f1_lu = 0.0
   
   do j = 1, nMagLats
