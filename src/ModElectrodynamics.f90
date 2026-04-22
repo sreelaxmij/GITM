@@ -69,7 +69,10 @@ module ModElectrodynamics
   real, dimension(:, :), allocatable :: oldpotmc
 
   real, dimension(:), allocatable :: &
-    x, y, rhs, b, d_I, e_I, e1_I, f_I, f1_I, d_lu, e_lu, e1_lu, f_lu, f1_lu, c_I
+    x, y, rhs, b, d_I, e_I, e1_I, f_I, f1_I, d_lu, e_lu, e1_lu, f_lu, f1_lu, c_I, g_I
+  ! Coupling
+ real, allocatable :: gamma_y(:,:) 
+ real :: gamma_peak = 0.01, gamma_min = 0.0025 ! 100 and 25
 
   real, dimension(:, :), allocatable :: &
     SmallMagLocTimeMC, SmallMagLatMC, SmallPotentialMC
@@ -78,6 +81,7 @@ module ModElectrodynamics
   integer :: nMagLons = 90  ! 4 degrees
   real :: MagLatRes = 0.5
   real :: MagLonRes = 4.0
+  integer :: nMagHemiLats = 91
 
   !----------------------------------------------------------------------
   ! These are in geographic coordinates :
