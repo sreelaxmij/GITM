@@ -4,6 +4,7 @@ subroutine coupling_function(gamma_peak, gamma_min)
       use ModConstants, only: pi
       use ModPlanet, only: RBody
       use ModElectrodynamics, only: nMagLons, nMagLats, gamma_y, MagLatMC
+      use ModGITM
       implicit none
 
       real, intent(in) :: gamma_peak, gamma_min
@@ -15,7 +16,7 @@ subroutine coupling_function(gamma_peak, gamma_min)
       nMagHemiLats = nMagLats / 2
       allocate(y_eq_to_pole(nMagHemiLats))
 
-      !  Equator-to-Pole distance array 
+      !  Equator-to-Pole array 
       do k = 1, nMagHemiLats
           ! k=1 is Near Equator. k=nMagHemiLats is Pole.
           ! jLocal for Near Equator is nMagHemiLats.
@@ -45,13 +46,19 @@ subroutine coupling_function(gamma_peak, gamma_min)
                   ! Python: gy_left = gamma_peak - m * (y_m[:indr+1] - y_m[0])
                     ! gamma_y(iLon, jLocal) = gamma_peak - m * y_eq_to_pole(k)
 
-                  gamma_y(iLon, jLocal) = gamma_peak - m * (y_eq_to_pole(k) - y_eq_to_pole(1))
+                  ! gamma_y(iLon, jLocal) = gamma_peak - m * (y_eq_to_pole(k) - y_eq_to_pole(1))
+                  
+                  gamma_y(iLon, jLocal) = 0.00
               else
                   ! Python: gy_right = np.zeros(...)
-                  gamma_y(iLon, jLocal) = 0.0
+                  gamma_y(iLon, jLocal) = 0.00
               end if
           end do
+          !  if (iProc == 0) then
+          !   print*, gamma_y(1,:)
+          ! end if
       end do
+       
       deallocate(y_eq_to_pole)
 end subroutine coupling_function
 !=========================================================================
@@ -107,7 +114,7 @@ subroutine preconditioner
   use ModElectrodynamics
   use ModLinearSolver
   use ModInterleavedIndexing, only: NH, SH, EQ, idxN, idxS, idxEq
-
+  use ModGITM
   implicit none
 
   integer :: iLon, j, iN, iS, iEq, nX
@@ -1389,7 +1396,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     enddo
     j = iEquator
     SigmaPPMC(i, j) = 0.9*(SigmaPPMC(i, j - 1) + SigmaPPMC(i, j + 1))/2.0
-    SigmaCCMC(i, j) = 0.9*(SigmaCCMC(i, j - 1) + SigmaCCMC(i, j - 1))/2.0
+    SigmaCCMC(i, j) = 0.9*(SigmaCCMC(i, j - 1) + SigmaCCMC(i, j + 1))/2.0
     SigmaPLMC(i, j) = -(sigmahhmc(i, j) - sigmaccmc(i, j))
     SigmaLPMC(i, j) = +(sigmahhmc(i, j) + sigmaccmc(i, j))
 
@@ -1719,6 +1726,10 @@ allocate(x(nTot), y(nTot), rhs(nTot), b(nTot), &
 
   call gmres(matvec_gitm, b, x, .true., nTot, & ! false
            MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe)      
+  if (iProc == 0) then
+    write(*, *) "GMRES finished with error code: ", iError
+    write(*, *) "GMRES finished with residual: ", Residual
+  endif
 
   call end_timing("dynamo_solver")
 
@@ -2067,6 +2078,7 @@ subroutine matvec_gitm(x_I, y_I, n)
   use ModElectrodynamics
   use ModInterleavedIndexing
   use ModLinearSolver
+  use ModGITM
 
   implicit none
 
@@ -2116,6 +2128,7 @@ subroutine matvec_gitm(x_I, y_I, n)
 
       y_I(iC) = d_I(iC)*x_I(iC) + f_I(iC)*x_I(iE) + e_I(iC)*x_I(iW) + &
                 g_I(iC)*(x_I(iOpp) - x_I(iC))
+      ! print*, y_I(iC)
 
       if (iP > 0) y_I(iC) = y_I(iC) + f1_I(iC)*x_I(iP)
       if (iQ > 0) y_I(iC) = y_I(iC) + e1_I(iC)*x_I(iQ)
@@ -2130,10 +2143,10 @@ subroutine matvec_gitm(x_I, y_I, n)
       iE = idxS(wrap_lon(iLon + 1, nMagLons), j, nMagLons)
       iW = idxS(wrap_lon(iLon - 1, nMagLons), j, nMagLons)
 
-        iP  = idxS(iLon, j - 1, nMagLons)
-        iEP = idxS(wrap_lon(iLon + 1, nMagLons), j - 1, nMagLons)
-        iWP = idxS(wrap_lon(iLon - 1, nMagLons), j - 1, nMagLons)
-        iOpp = idxN(iLon, j, nMagLons)
+      iP  = idxS(iLon, j - 1, nMagLons)
+      iEP = idxS(wrap_lon(iLon + 1, nMagLons), j - 1, nMagLons)
+      iWP = idxS(wrap_lon(iLon - 1, nMagLons), j - 1, nMagLons)
+      iOpp = idxN(iLon, j, nMagLons)
 
       if (j == nLatH) then
         iQ  = idxEq(iLon, nLatH, nMagLons)
@@ -2146,7 +2159,13 @@ subroutine matvec_gitm(x_I, y_I, n)
       endif
 
       y_I(iC) = d_I(iC)*x_I(iC) + f_I(iC)*x_I(iE) + e_I(iC)*x_I(iW) + &
-                g_I(iC)*(x_I(iOpp) - x_I(iC))
+                g_I(iC)*(+x_I(iOpp) - x_I(iC))
+      
+      ! if (iProc == 0 .and. j == 35 .and. iLon == 1) then
+      !     print*, "d,e,f,e1,f1,c,g:", (d_I(iC)), (e_I(iC)), (f_I(iC)), (e1_I(iC)), (f1_I(iC)), (c_I(iC)), (g_I(iC))
+      ! endif
+ 
+      ! print*, y_I(iC)
 
       if (iP > 0) y_I(iC) = y_I(iC) + f1_I(iC)*x_I(iP)
       if (iQ > 0) y_I(iC) = y_I(iC) + e1_I(iC)*x_I(iQ)

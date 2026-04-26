@@ -72,7 +72,7 @@ module ModElectrodynamics
     x, y, rhs, b, d_I, e_I, e1_I, f_I, f1_I, d_lu, e_lu, e1_lu, f_lu, f1_lu, c_I, g_I
   ! Coupling
  real, allocatable :: gamma_y(:,:) 
- real :: gamma_peak = 0.01, gamma_min = 0.0025 ! 100 and 25
+ real :: gamma_peak = 100.0, gamma_min = 25.0 ! 100 and 25
 
   real, dimension(:, :), allocatable :: &
     SmallMagLocTimeMC, SmallMagLatMC, SmallPotentialMC
