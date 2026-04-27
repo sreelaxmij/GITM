@@ -48,7 +48,7 @@ subroutine coupling_function(gamma_peak, gamma_min)
 
                   ! gamma_y(iLon, jLocal) = gamma_peak - m * (y_eq_to_pole(k) - y_eq_to_pole(1))
                   
-                  gamma_y(iLon, jLocal) = 0.00
+                  gamma_y(iLon, jLocal) = 0.01
               else
                   ! Python: gy_right = np.zeros(...)
                   gamma_y(iLon, jLocal) = 0.00
@@ -193,7 +193,7 @@ contains
     do iLat = 2, nMagLats - 1
       do iLon = 1, nMagLons
         iI = iI + 1
-        d_lu(iI)  = -2.0*(solver_a_mc(iLon, iLat) + solver_b_mc(iLon, iLat))
+        d_lu(iI)  = -2.0*(solver_a_mc(iLon, iLat) + solver_b_mc(iLon, iLat)) 
         e_lu(iI)  =  solver_a_mc(iLon, iLat) - solver_e_mc(iLon, iLat)
         f_lu(iI)  =  solver_a_mc(iLon, iLat) + solver_e_mc(iLon, iLat)
         e1_lu(iI) =  solver_b_mc(iLon, iLat) - solver_d_mc(iLon, iLat)
