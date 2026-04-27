@@ -1671,9 +1671,17 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     SmallPotentialMC = 0.0
   endif
 
-  ! call coupling_function(gamma_peak, gamma_min)
+  call coupling_function(gamma_peak, gamma_min)
+  allocate(g_I(nX))
+  g_I = 0.0
 
-  ! call preconditioner()
+  do p = 1, nPair
+    do iLon = 1, nMagLons
+      g_I(idxS(iLon,p,nMagLons)) = gamma_y(iLon, p+1)
+      g_I(idxN(iLon,p,nMagLons)) = gamma_y(iLon, p+1)
+    end do
+  end do
+
   do p = 1, nPair
     jS = p + 1 ! Southern hemisphere index in the 2D grid
     jN = nMagLats - p ! Northern hemisphere index in the 2D grid
@@ -1736,14 +1744,6 @@ call apply_preconditioner(b)
   if (iDebugLevel > 0) &
     write(*, *) "=> gmres : ", MaxIteration, Residual, nIteration, iError
 
-  ! iI = 0
-  ! do iLat = 2, nMagLats - 1
-  !   do iLon = 1, nMagLons
-  !     iI = iI + 1
-  !     DynamoPotentialMC(iLon, iLat) = x(iI)
-  !   enddo
-  ! enddo
-
 
 ! Put 1D vector into 2D solution
   
@@ -1768,16 +1768,16 @@ DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :) ! Periodic boundary
 OldPotMC = DynamoPotentialMC
 
 ! Mirroring NH solution to SH 
-do iLat = 2, nMagLats/2
-  do iLon = 1, nMagLons
-    iI = nMagLats - iLat + 1
-    DynamoPotentialMC(iLon, iLat) = OldPotMC(iLon, iI)
-  end do
-end do
-DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :)
+! do iLat = 2, nMagLats/2
+!   do iLon = 1, nMagLons
+!     iI = nMagLats - iLat + 1
+!     DynamoPotentialMC(iLon, iLat) = OldPotMC(iLon, iI)
+!   end do
+! end do
+! DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :)
 
 
-if (allocated(b)) deallocate(x, y, b, rhs, d_lu, e_lu, f_lu, e1_lu, f1_lu)
+if (allocated(b)) deallocate(x, y, b, rhs, d_lu, e_lu, f_lu, e1_lu, f1_lu, g_I)
 
   ! Electric fields
 
@@ -2092,6 +2092,7 @@ subroutine matvec_gitm(x_I, y_I, n)
   integer :: iC, iE, iW
   integer :: iJp, iJm, iJpE, iJpW, iJmE, iJmW
   real :: a0, b0, c0, d0, e0
+  integer :: iOpp
 
   nLatH = nMagLats / 2
   nPair = nLatH - 1
@@ -2110,6 +2111,7 @@ subroutine matvec_gitm(x_I, y_I, n)
       iC = idxS(iLon,  p, nMagLons)
       iE = idxS(iLonE, p, nMagLons)
       iW = idxS(iLonW, p, nMagLons)
+      iOpp = idxN(iLon, p, nMagLons)
 
       ! old global j+1 direction
       if (p == nPair) then
@@ -2138,10 +2140,12 @@ subroutine matvec_gitm(x_I, y_I, n)
       c0 = solver_c_mc(iLon, jG)
       d0 = solver_d_mc(iLon, jG)
       e0 = solver_e_mc(iLon, jG)
+      g_I(iC) = gamma_y(iLon, p+1)
 
       y_I(iC) = -(2.0*a0 + 2.0*b0) * x_I(iC) + &
                  (a0 + e0) * x_I(iE) + &
-                 (a0 - e0) * x_I(iW)
+                 (a0 - e0) * x_I(iW) + &
+                 g_I(iC) * (x_I(iOpp)-x_I(iC))
 
       if (iJp  > 0) y_I(iC) = y_I(iC) + (b0 + d0) * x_I(iJp)
       if (iJpE > 0) y_I(iC) = y_I(iC) + c0 * x_I(iJpE)
@@ -2161,6 +2165,7 @@ subroutine matvec_gitm(x_I, y_I, n)
       iC = idxN(iLon,  p, nMagLons)
       iE = idxN(iLonE, p, nMagLons)
       iW = idxN(iLonW, p, nMagLons)
+      iOpp = idxS(iLon, p, nMagLons)
 
       ! old global j+1 direction
       if (p == 1) then
@@ -2189,10 +2194,12 @@ subroutine matvec_gitm(x_I, y_I, n)
       c0 = solver_c_mc(iLon, jG)
       d0 = solver_d_mc(iLon, jG)
       e0 = solver_e_mc(iLon, jG)
+      g_I(iC) = gamma_y(iLon, p+1)
 
       y_I(iC) = -(2.0*a0 + 2.0*b0) * x_I(iC) + &
                  (a0 + e0) * x_I(iE) + &
-                 (a0 - e0) * x_I(iW)
+                 (a0 - e0) * x_I(iW) + &
+                 g_I(iC) * (x_I(iOpp)-x_I(iC))
 
       if (iJp  > 0) y_I(iC) = y_I(iC) + (b0 + d0) * x_I(iJp)
       if (iJpE > 0) y_I(iC) = y_I(iC) + c0 * x_I(iJpE)
