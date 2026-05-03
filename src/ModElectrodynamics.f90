@@ -77,7 +77,7 @@ module ModElectrodynamics
   real, dimension(:, :), allocatable :: &
     SmallMagLocTimeMC, SmallMagLatMC, SmallPotentialMC
 
-  integer :: nMagLats = 140  ! 1 degrees
+  integer :: nMagLats = 160  ! 1 degrees 140
   integer :: nMagLons = 90  ! 4 degrees
   real :: MagLatRes = 0.5
   real :: MagLonRes = 4.0

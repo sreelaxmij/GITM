@@ -48,7 +48,7 @@ subroutine coupling_function(gamma_peak, gamma_min)
 
                   ! gamma_y(iLon, jLocal) = gamma_peak - m * (y_eq_to_pole(k) - y_eq_to_pole(1))
                   
-                  gamma_y(iLon, jLocal) = 0.01
+                  gamma_y(iLon, jLocal) = 0.05
               else
                   ! Python: gy_right = np.zeros(...)
                   gamma_y(iLon, jLocal) = 0.00
@@ -85,7 +85,7 @@ contains
   end function idxS
 
   ! Equator index at (iLon)
-  ! Starts exactly after the last paired SH cell (2 * nLatH * nLon)
+  ! Starts exactly after the last paired cell (2 * nLatH * nLon)
   integer function idxEq(iLon, nLatH, nLon) result(i)
     implicit none
     integer, intent(in) :: iLon, nLatH, nLon
@@ -1373,20 +1373,20 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
       k = nMagLats - j + 1     ! Mirror point in the Northern hemisphere
 
-      SigmaLLMC(i, j) = SigmaLLMC(i, j) + SigmaLLMC(i, k)
-      SigmaPPMC(i, j) = SigmaPPMC(i, j) + SigmaPPMC(i, k)
-      KDpmMC(i, j) = KDpmMC(i, j) + KDpmMC(i, k)
-      SigmaPLMC(i, j) = SigmaPLMC(i, k) - SigmaPLMC(i, j)
-      SigmaLPMC(i, j) = SigmaLPMC(i, k) - SigmaLPMC(i, j)
-      KDlmMC(i, j) = KDlmMC(i, k) - KDlmMC(i, j)
+      ! SigmaLLMC(i, j) = SigmaLLMC(i, j) + SigmaLLMC(i, k)
+      ! SigmaPPMC(i, j) = SigmaPPMC(i, j) + SigmaPPMC(i, k)
+      ! KDpmMC(i, j) = KDpmMC(i, j) + KDpmMC(i, k)
+      SigmaPLMC(i, j) =  - SigmaPLMC(i, j) !SigmaPLMC(i, k)
+      SigmaLPMC(i, j) =  - SigmaLPMC(i, j) !SigmaLPMC(i, k)
+      KDlmMC(i, j) = - KDlmMC(i, j) !KDlmMC(i, k) 
 
       !  For Northern hemisphere
-      SigmaPPMC(i, k) = SigmaPPMC(i, j)
-      SigmaLLMC(i, k) = SigmaLLMC(i, j)
-      KDpmMC(i, k) = KDpmMC(i, j)
-      SigmaPLMC(i, k) = SigmaPLMC(i, j)
-      SigmaLPMC(i, k) = SigmaLPMC(i, j)
-      KDlmMC(i, k) = KDlmMC(i, j)
+      ! SigmaPPMC(i, k) = SigmaPPMC(i, j)
+      ! SigmaLLMC(i, k) = SigmaLLMC(i, j)
+      ! KDpmMC(i, k) = KDpmMC(i, j)
+      ! SigmaPLMC(i, k) = SigmaPLMC(i, j)
+      ! SigmaLPMC(i, k) = SigmaLPMC(i, j)
+      ! KDlmMC(i, k) = KDlmMC(i, j)
 
       if (SigmaLLMC(i, j) > 10000.0) &
         write(*, *) 'SigmaLLMC:', iproc, MagLonMC(i, j), MagLatMC(i, j), MagLatMC(i, k), SigmaLLMC(i, j)
@@ -1517,8 +1517,8 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   solver_c_mc = deltalmc*deltapmc*(SigmaPLmc + SigmaLPmc)
 
   solver_d_mc = 2.0*deltalmc*deltapmc**2* &
-                (dSigmaPLdpMC - sign(1.0, MagLatMC)*sin(MagLatMC*pi/180)*sigmallmc &
-                 + cos(MagLatMC*pi/180)*dSigmaLLdlMC*sign(1.0, MagLatMC))
+                (sign(1.0, MagLatMC)*dSigmaPLdpMC - sin(MagLatMC*pi/180)*sigmallmc &
+                 + cos(MagLatMC*pi/180)*dSigmaLLdlMC)
 
   solver_e_mc = 2.0*deltalmc**2*deltapmc*( &
                 dSigmaPPdpMC/cos(MagLatMC*pi/180) + dSigmaLPdlMC*sign(1.0, MagLatMC))
@@ -1599,7 +1599,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
           SigmaLPMC(i, j)
 
         solver_d_mc(i, j) = solver_d_mc(i, j) &
-                            - 2.0*deltalmc(i, j)*deltapmc(i, j)**2* &
+                            - sign(1.0, MagLatMC(i, j))* 2.0*deltalmc(i, j)*deltapmc(i, j)**2* &
                             dSigmaPLdpMC(i, j)
 
         solver_e_mc(i, j) = 2.0*deltalmc(i, j)**2* &
@@ -1716,8 +1716,8 @@ call apply_preconditioner(b)
 
 
   call start_timing("dynamo_solver")
-
-  MaxIteration = 200      !good enough : 200
+ 
+  MaxIteration = nItersMax      !good enough : 200
   nIteration = 0
   iError = 0
   if (iDebugLevel > 2) then
@@ -1726,7 +1726,7 @@ call apply_preconditioner(b)
     DoTestMe = .false.
   endif
 
-  Residual = 1.0    !! Residual = 1.0 iterations required ~ 103
+  Residual = MaxResidual    !! Residual = 1.0 iterations required ~ 103
              !! with Residual=0.01,only 20 more iterations are required (~ 122)
 
   ! call gmres(matvec_gitm, b, x, .true., nX, &
@@ -1737,6 +1737,7 @@ call apply_preconditioner(b)
   if (iProc == 0) then
     write(*, *) "GMRES finished with error code: ", iError
     write(*, *) "GMRES finished with residual: ", Residual
+    write(*, *) "Iteration", nIteration
   endif
 
   call end_timing("dynamo_solver")
