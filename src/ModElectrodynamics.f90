@@ -21,6 +21,7 @@ module ModElectrodynamics
     SigmaPP, SigmaLL, SigmaHH, SigmaCC, SigmaPL, SigmaLP, &
     KDpm, KDlm, Kpm, Klm
   real, dimension(-1:nLons + 2, -1:nLats + 2, -1:nAlts + 2) :: ed1, ed2, je1, je2
+  logical :: UseSHPoleWrapping = .true.
 
   ! This is the field aligned integral in magnetic coordinates
   real, dimension(:, :), allocatable :: DivJuAltMC
@@ -77,7 +78,7 @@ module ModElectrodynamics
   real, dimension(:, :), allocatable :: &
     SmallMagLocTimeMC, SmallMagLatMC, SmallPotentialMC
 
-  integer :: nMagLats = 160  ! 1 degrees 140
+  integer :: nMagLats = 140  ! 1 degrees 140
   integer :: nMagLons = 90  ! 4 degrees
   real :: MagLatRes = 0.5
   real :: MagLonRes = 4.0

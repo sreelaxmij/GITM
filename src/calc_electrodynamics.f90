@@ -48,7 +48,7 @@ subroutine coupling_function(gamma_peak, gamma_min)
 
                   ! gamma_y(iLon, jLocal) = gamma_peak - m * (y_eq_to_pole(k) - y_eq_to_pole(1))
                   
-                  gamma_y(iLon, jLocal) = 0.05
+                  gamma_y(iLon, jLocal) = 1.0
               else
                   ! Python: gy_right = np.zeros(...)
                   gamma_y(iLon, jLocal) = 0.00
@@ -1624,7 +1624,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   ! Add this to make sure solver_a never goes below 0
   where (solver_a_mc < 0.001) solver_a_mc = 0.001
 
-  DynamoPotentialMC = 0.0
+  ! DynamoPotentialMC = 0.0
 
   ! Fill in the diagonal vectors
   nLatH = nMagLats / 2
@@ -1691,13 +1691,13 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
       iN = idxN(iLon, p, nMagLons) ! Northern hemisphere index in the 1D vector
 
       b(iS) = solver_s_mc(iLon, jS) ! Right-hand side for the southern hemisphere point
-      x(iS) = DynamoPotentialMC(iLon, jS) ! Initial guess for the southern hemisphere point
-      if (p == 1) then
+      x(iS) = OldPotMC(iLon, jS) ! Initial guess for the southern hemisphere point
+      if (p == 1 .and. .not. UseSHPoleWrapping) then
         b(iS) = b(iS) - (solver_b_mc(iLon, jS) - solver_d_mc(iLon, jS)) * SmallPotentialMC(iLon, 1) ! Adjust the right-hand side for the southern hemisphere point if it's the first pair i.e., closest to the pole
       end if
 
       b(iN) = solver_s_mc(iLon, jN)
-      x(iN) = DynamoPotentialMC(iLon, jN)
+      x(iN) = OldPotMC(iLon, jN)
       if (p == 1) then
         b(iN) = b(iN) - (solver_b_mc(iLon, jN) + solver_d_mc(iLon, jN)) * SmallPotentialMC(iLon, 2)
       end if
@@ -1707,7 +1707,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   do iLon = 1, nMagLons
     iEq = idxEq(iLon, nPair, nMagLons)
     b(iEq) = solver_s_mc(iLon, jEq)
-    x(iEq) = DynamoPotentialMC(iLon, jEq)
+    x(iEq) = OldPotMC(iLon, jEq)
   end do
 
   rhs = b
@@ -2094,6 +2094,7 @@ subroutine matvec_gitm(x_I, y_I, n)
   integer :: iJp, iJm, iJpE, iJpW, iJmE, iJmW
   real :: a0, b0, c0, d0, e0
   integer :: iOpp
+  integer :: iLonP, iLonPE, iLonPW
 
   nLatH = nMagLats / 2
   nPair = nLatH - 1
@@ -2127,9 +2128,19 @@ subroutine matvec_gitm(x_I, y_I, n)
 
       ! old global j-1 direction
       if (p == 1) then
-        iJm  = 0
-        iJmE = 0
-        iJmW = 0
+        if (UseSHPoleWrapping) then
+          iLonP  = wrap_lon(iLon  + nMagLons/2, nMagLons)
+          iLonPE = wrap_lon(iLonE + nMagLons/4, nMagLons)
+          iLonPW = wrap_lon(iLonW + 3*nMagLons/4, nMagLons)
+
+          iJm  = idxS(iLonP,  1, nMagLons)
+          iJmE = idxS(iLonPE, 1, nMagLons)
+          iJmW = idxS(iLonPW, 1, nMagLons)
+        else          
+          iJm  = 0
+          iJmE = 0
+          iJmW = 0
+        endif
       else
         iJm  = idxS(iLon,  p - 1, nMagLons)
         iJmE = idxS(iLonE, p - 1, nMagLons)

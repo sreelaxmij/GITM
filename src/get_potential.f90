@@ -137,6 +137,7 @@ subroutine get_potential(iBlock)
   real :: maxEnergyFlux
 
   real, dimension(-1:nLons + 2, -1:nLats + 2) :: TempPotential2d
+  real, dimension(-1:nLons + 2, -1:nLats + 2) :: TempFAC2d
   real, dimension(-1:nLons + 2, -1:nLats + 2, 2) :: TempPotential, AMIEPotential
   real, dimension(-1:nLons + 2, -1:nLats + 2) :: Grid, dynamo, SubMLats, SubMLons
   real, dimension(-1:nLons + 2, -1:nLats + 2) :: lats, mlts, EFlux
@@ -189,8 +190,16 @@ subroutine get_potential(iBlock)
 
       TempPotential = 0.0
       TempPotential2d = 0.0
+      TempFAC2d = 0.0
 
       call iemodel_%get_potential(TempPotential2d)
+      
+      ! if (iAlt == 1) then
+      !    call iemodel_%get_FACs(TempFAC2d)
+      !   !  write(*,*) 'DEBUG GITM FAC min/max = ', &
+      !   !       minval(TempFAC2d), maxval(TempFAC2d)
+      ! endif
+      
       TempPotential(:, :, 1) = TempPotential2d
       MagnetosphericPotential(:, :, iAlt) = TempPotential2d
 
