@@ -41,6 +41,8 @@ subroutine coupling_function(gamma_peak, gamma_min)
           do k = 1, nMagHemiLats
               ! Map 'k' back to the preconditioner's jLocal (Pole to Equator)
               jLocal = nMagHemiLats - k + 1
+              ! gamma_y(iLon, jLocal) = 0.01
+
 
               if (k <= indr) then
                   ! Python: gy_left = gamma_peak - m * (y_m[:indr+1] - y_m[0])
@@ -48,7 +50,7 @@ subroutine coupling_function(gamma_peak, gamma_min)
 
                   ! gamma_y(iLon, jLocal) = gamma_peak - m * (y_eq_to_pole(k) - y_eq_to_pole(1))
                   
-                  gamma_y(iLon, jLocal) = 1.0
+                  gamma_y(iLon, jLocal) = 1.00
               else
                   ! Python: gy_right = np.zeros(...)
                   gamma_y(iLon, jLocal) = 0.00
@@ -763,6 +765,9 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
       DivJuAlt(:, :) = DivJuAlt(:, :) + DivJu(:, :, k)*dAlt_GB(:, :, k, iBlock)
     enddo
 
+  ! --------------------------------------------------------------
+  ! move to electrodynamics_fieldline_integrals:
+
     call report("Field-line integrals", 2)
     if (UseBarriers) call MPI_BARRIER(iCommGITM, iError)
 
@@ -1263,6 +1268,10 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   KpmMC = AverageMC/(iAve*2 + 1)
   KpmMC(nMagLons + 1, :) = KpmMC(1, :)
 
+
+  ! ------------------------------------------------------------------------------------------------------
+  ! Move to electrodynamics_equatorial_mods():
+  
   ! Let's find as close to noon as possible
 
   iLonNoon = 1
@@ -1452,6 +1461,9 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     KDpmMC(i, iEquator) = 0.92*(KDpmMC(i, iEquator - 1) + KDpmMC(i, iEquator + 1))/2
   enddo
 
+  ! -----------------------------------------------------------------------------------------------
+  ! move to electrodynamics_gradients():
+
   !============
 
   do i = 1, nMagLons + 1
@@ -1512,6 +1524,9 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     dKpmdpMC(nMagLons + 1, j) = dKpmdpMC(1, j)
   enddo
 
+  ! -------------------------------------------------------------------------------------------------------
+  ! move to electroydnamics_solver_coefficients():
+
   solver_a_mc = 4*deltalmc**2*sigmappmc/cos(MagLatMC*pi/180)
   solver_b_mc = 4*deltapmc**2*cos(MagLatMC*pi/180)*sigmallmc
   solver_c_mc = deltalmc*deltapmc*(SigmaPLmc + SigmaLPmc)
@@ -1556,6 +1571,9 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   !  endif
 
   ! Do the cowling conductivity within +/- 6 deg of equator
+
+  ! ------------------------------------------------------------------------------
+  ! move to electrodynamics_cowling_conductivity():
 
   SigmaCowlingMC = 0.0
 
@@ -1621,6 +1639,8 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
   endif
 
+  ! --------------------------------------------------------------
+
   ! Add this to make sure solver_a never goes below 0
   where (solver_a_mc < 0.001) solver_a_mc = 0.001
 
@@ -1632,15 +1652,23 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   jEq   = nLatH + 1
   nX    = (2*nPair + 1) * nMagLons ! nX is the size of the linear system to be solved
 
-  allocate(x(nX), y(nX), rhs(nX), b(nX), &
-          d_lu(nX), e_lu(nX), f_lu(nX), e1_lu(nX), f1_lu(nX))
+  ! if (.not. IsInitialized) then
 
-  ! Initialize the solution and right-hand side vectors
-  x = 0.0 ! Initial guess for the solution
-  y = 0.0 ! Temporary vector for matrix-vector products - y = Ax
-  rhs = 0.0 ! Right-hand side of the linear system
-  b = 0.0 !  Temporary vector for the right-hand side
+    allocate(x(nX), y(nX), rhs(nX), b(nX), &
+            d_lu(nX), e_lu(nX), f_lu(nX), e1_lu(nX), f1_lu(nX))
 
+    ! Initialize the solution and right-hand side vectors
+    x = 0.0 ! Initial guess for the solution
+
+  !   IsInitialized = .true.
+  ! endif
+
+    y = 0.0 ! Temporary vector for matrix-vector products - y = Ax
+    rhs = 0.0 ! Right-hand side of the linear system
+    b = 0.0 !  Temporary vector for the right-hand side
+
+  ! --------------------------------------------------------------
+  ! move to electrodynamics_set_fixed_BCs():
 
   ! call UA_SetnMLTs(nMagLons + 1)
   call ieModel_%nMlts(nMagLons + 1)
@@ -1661,8 +1689,13 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   endif
 
   iError = 0
+  ! Save previous solution for use as an initial guess in the solver
+  SmallPotentialMC = 0.0
+
   ! call UA_GetPotential(SmallPotentialMC, iError)
-  call ieModel_%get_potential(SmallPotentialMC)
+  if (.not. UseSHPoleWrapping) then
+    call ieModel_%get_potential(SmallPotentialMC)
+  endif
 
   if (iError /= 0) then
     write(*, *) "Error in routine calc_electrodynamics (UA_GetPotential):"
@@ -1670,6 +1703,9 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     !     call stop_gitm("Stopping in calc_electrodynamics")
     SmallPotentialMC = 0.0
   endif
+
+  ! --------------------------------------------------------------
+
 
   call coupling_function(gamma_peak, gamma_min)
   allocate(g_I(nX))
@@ -1697,7 +1733,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
       end if
 
       b(iN) = solver_s_mc(iLon, jN)
-      x(iN) = OldPotMC(iLon, jN)
+      x(iN) = OldPotMC(iLon, jN) ! Initial guess for the northern hemisphere point
       if (p == 1) then
         b(iN) = b(iN) - (solver_b_mc(iLon, jN) + solver_d_mc(iLon, jN)) * SmallPotentialMC(iLon, 2)
       end if
@@ -1707,7 +1743,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   do iLon = 1, nMagLons
     iEq = idxEq(iLon, nPair, nMagLons)
     b(iEq) = solver_s_mc(iLon, jEq)
-    x(iEq) = OldPotMC(iLon, jEq)
+    x(iEq) = OldPotMC(iLon, jEq) ! Initial guess for the equatorial point
   end do
 
   rhs = b
@@ -1733,11 +1769,16 @@ call apply_preconditioner(b)
   !            MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe)
 
   call gmres(matvec_gitm, b, x, .true., nX, & ! false
-           MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe)      
+           MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe) 
+  ! write(*,*) "Starting BiCGSTAB solver...", Residual
+  
+  ! call bicgstab(matvec_gitm,b,x,.true.,nX,Residual,'abs',nIteration,iError,DoTestMe)
+
   if (iProc == 0) then
-    write(*, *) "GMRES finished with error code: ", iError
-    write(*, *) "GMRES finished with residual: ", Residual
-    write(*, *) "Iteration", nIteration
+    write(*,*), Residual
+    ! write(*, *) "GMRES finished with error code: ", iError
+    ! write(*, *) "GMRES finished with residual: ", Residual
+    ! write(*, *) "Iteration", nIteration
   endif
 
   call end_timing("dynamo_solver")
@@ -1766,7 +1807,10 @@ end do
 DynamoPotentialMC(:, 1) = 0.0
 DynamoPotentialMC(:, nMagLats) = 0.0 !
 DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :) ! Periodic boundary condition in longitude
-OldPotMC = DynamoPotentialMC
+OldPotMC = DynamoPotentialMC ! Save the solution for use as an initial guess in the next time step
+
+! DynamoPotentialMC = DynamoPotentialMC - mean(DynamoPotentialMC)
+! DynamoPotentialMC = DynamoPotentialMC - DynamoPotentialMC(1,iEquator)
 
 ! Mirroring NH solution to SH 
 ! do iLat = 2, nMagLats/2

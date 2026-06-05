@@ -83,6 +83,7 @@ module ModElectrodynamics
   real :: MagLatRes = 0.5
   real :: MagLonRes = 4.0
   integer :: nMagHemiLats = 91
+  logical :: IsInitialized = .false.
 
   !----------------------------------------------------------------------
   ! These are in geographic coordinates :
