@@ -122,66 +122,6 @@ module ModInterleavedSolverHelpers
 
 contains
 
-  subroutine interleaved_to_old(vec_new, vec_old)
-    use ModElectrodynamics, only: nMagLats, nMagLons
-    use ModInterleavedIndexing, only: idxN, idxS, idxEq, idxOld
-    implicit none
-
-    real, intent(in)  :: vec_new(:)
-    real, intent(out) :: vec_old(:)
-    integer :: nLatH, nPair, jEq
-    integer :: p, jS, jN, iLon
-
-    nLatH = nMagLats / 2
-    nPair = nLatH - 1
-    jEq   = nLatH + 1
-
-    vec_old = 0.0
-
-    do p = 1, nPair
-      jS = p + 1
-      jN = nMagLats - p
-      do iLon = 1, nMagLons
-        vec_old(idxOld(iLon, jS, nMagLons)) = vec_new(idxS(iLon, p, nPair))
-        vec_old(idxOld(iLon, jN, nMagLons)) = vec_new(idxN(iLon, p, nPair))
-      end do
-    end do
-
-    do iLon = 1, nMagLons
-      vec_old(idxOld(iLon, jEq, nMagLons)) = vec_new(idxEq(iLon, nPair, nMagLons))
-    end do
-  end subroutine interleaved_to_old
-
-  subroutine old_to_interleaved(vec_old, vec_new)
-    use ModElectrodynamics, only: nMagLats, nMagLons
-    use ModInterleavedIndexing, only: idxN, idxS, idxEq, idxOld
-    implicit none
-
-    real, intent(in)  :: vec_old(:)
-    real, intent(out) :: vec_new(:)
-    integer :: nLatH, nPair, jEq
-    integer :: p, jS, jN, iLon
-
-    nLatH = nMagLats / 2
-    nPair = nLatH - 1
-    jEq   = nLatH + 1
-
-    vec_new = 0.0
-
-    do p = 1, nPair
-      jS = p + 1
-      jN = nMagLats - p
-      do iLon = 1, nMagLons
-        vec_new(idxS(iLon, p, nPair)) = vec_old(idxOld(iLon, jS, nMagLons))
-        vec_new(idxN(iLon, p, nPair)) = vec_old(idxOld(iLon, jN, nMagLons))
-      end do
-    end do
-
-    do iLon = 1, nMagLons
-      vec_new(idxEq(iLon, nPair, nMagLons)) = vec_old(idxOld(iLon, jEq, nMagLons))
-    end do
-  end subroutine old_to_interleaved
-
   subroutine build_preconditioner
     use ModElectrodynamics
     use ModLinearSolver
