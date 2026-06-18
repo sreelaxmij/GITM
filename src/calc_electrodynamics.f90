@@ -76,14 +76,14 @@ module ModInterleavedIndexing
 contains
 
   ! NH index: p (pair/latitude) varies fastest within each longitude group.
-  ! lat neighbor at stride +-2 (M1=2), lon neighbor at stride +-2*nPair (M2).
+  ! lat neighbor at  +-2 (M1=2), lon neighbor at  +-2*nPair (M2).
   integer function idxN(iLon, p, nPair) result(i)
     implicit none
     integer, intent(in) :: iLon, p, nPair
     i = 2 * ( (iLon - 1) * nPair + (p - 1) ) + 1
   end function idxN
 
-  ! SH index = NH + 1; gamma coupling at stride +-1.
+  ! SH index = NH + 1; gamma coupling at  +-1.
   integer function idxS(iLon, p, nPair) result(i)
     implicit none
     integer, intent(in) :: iLon, p, nPair
@@ -222,7 +222,7 @@ contains
         d_lu(iS)  = -(2.0*a0 + 2.0*b0 + gval)
         e_lu(iS)  = gval       ! gamma: iS-1 = iN
         f_lu(iS)  = 0.0
-        ! latitude (stride +-2, M1=2)
+        ! latitude ( +-2, M1=2)
         if (p == 1) then
           e1_lu(iS) = 0.0      ! SH polar BC
         else
@@ -233,7 +233,7 @@ contains
         else
           f1_lu(iS) = b0 + d0  ! equatorward: iS(iLon,p+1)
         end if
-        ! longitude (stride +-2*nPair, M2); zero at periodic wrap endpoints
+        ! longitude ( +-2*nPair, M2); zero at periodic wrap endpoints
         if (iLon == 1) then
           e2_lu(iS) = 0.0
         else
@@ -253,7 +253,7 @@ contains
         d_lu(iN)  = -(2.0*a0 + 2.0*b0 + gval)
         f_lu(iN)  = gval       ! gamma: iN+1 = iS
         e_lu(iN)  = 0.0
-        ! latitude (stride +-2, M1=2)
+        ! latitude ( +-2, M1=2)
         if (p == 1) then
           e1_lu(iN) = 0.0      ! NH polar BC
         else
@@ -264,7 +264,7 @@ contains
         else
           f1_lu(iN) = b0 - d0  ! equatorward: iN(iLon,p+1)
         end if
-        ! longitude (stride +-2*nPair, M2); zero at periodic wrap endpoints
+        ! longitude ( +-2*nPair, M2); zero at periodic wrap endpoints
         if (iLon == 1) then
           e2_lu(iN) = 0.0
         else
@@ -279,7 +279,7 @@ contains
       end do
     end do
 
-    ! Equatorial row: lon neighbors at stride +-1 → use e/f band directly
+    ! Equatorial row: lon neighbors at  +-1 : use e/f directly
     do iLon = 1, nMagLons
       iEq = idxEq(iLon, nPair, nMagLons)
       a0  = solver_a_mc(iLon, jEq)
@@ -295,7 +295,7 @@ contains
       e2_lu(iEq) = 0.0
       f2_lu(iEq) = 0.0
     end do
-
+                                                                                                                
     call prehepta(size(d_lu), 1, 2, 2*nPair, -0.5, &
                   d_lu, e_lu, f_lu, e1_lu, f1_lu, e2_lu, f2_lu)
   end subroutine build_preconditioner
@@ -348,7 +348,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   use ModMPI
   use ModTime
   use ModMagTrace
-  use ModInterleavedIndexing, only: idxN, idxS, idxEq
+  use ModInterleavedIndexing, only: idxN, idxS, idxEq, wrap_lon
   use ModInterleavedSolverHelpers, only: build_preconditioner, apply_preconditioner
 
   implicit none
@@ -413,6 +413,9 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
   call report("UA_calc_electrodynamics", 1)
   call start_timing("calc_electrodyn")
+
+  if (FloatNorth .and. FloatSouth) &
+    call stop_gitm("calc_electrodynamics: FloatNorth and FloatSouth cannot both be .true.")
 
   ! DynamoHighLatBoundary now set in UA_Wrapper.f90 to enable
   ! inter-compatibility with standalone GITM.
@@ -1779,9 +1782,8 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   ! Save previous solution for use as an initial guess in the solver
   SmallPotentialMC = 0.0
 
-  ! call UA_GetPotential(SmallPotentialMC, iError)
-  if (.not. UseSHPoleWrapping) then
-    call ieModel_%get_potential(SmallPotentialMC)
+  if (.not. FloatNorth .or. .not. FloatSouth) then
+      call ieModel_%get_potential(SmallPotentialMC)
   endif
 
   if (iError /= 0) then
@@ -1815,14 +1817,23 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
       b(iS) = solver_s_mc(iLon, jS) ! Right-hand side for the southern hemisphere point
       x(iS) = OldPotMC(iLon, jS) ! Initial guess for the southern hemisphere point
-      if (p == 1 .and. .not. UseSHPoleWrapping) then
-        b(iS) = b(iS) - (solver_b_mc(iLon, jS) - solver_d_mc(iLon, jS)) * SmallPotentialMC(iLon, 1) ! Adjust the right-hand side for the southern hemisphere point if it's the first pair i.e., closest to the pole
+      if (p == 1 .and. .not. FloatSouth) then
+        ! N term: direct poleward neighbor at j=1 (Weimer), same longitude
+        b(iS) = b(iS) - (solver_b_mc(iLon, jS) - solver_d_mc(iLon, jS)) * SmallPotentialMC(iLon, 1)
+        ! NE/NW terms: cross-derivative stencil couples to j=1 at iLon+1 and iLon-1
+        !  -c0*phi(j-1,iLon+1) and +c0*phi(j-1,iLon-1)
+        b(iS) = b(iS) + solver_c_mc(iLon, jS) * SmallPotentialMC(wrap_lon(iLon+1, nMagLons), 1)
+        b(iS) = b(iS) - solver_c_mc(iLon, jS) * SmallPotentialMC(wrap_lon(iLon-1, nMagLons), 1)
       end if
 
       b(iN) = solver_s_mc(iLon, jN)
       x(iN) = OldPotMC(iLon, jN) ! Initial guess for the northern hemisphere point
-      if (p == 1) then
+      if (p == 1 .and. .not. FloatNorth) then
+        ! N term: direct poleward neighbor at j=nMagLats (Weimer), same longitude
         b(iN) = b(iN) - (solver_b_mc(iLon, jN) + solver_d_mc(iLon, jN)) * SmallPotentialMC(iLon, 2)
+        ! NE/NW terms for NH (poleward = j+1 direction for NH)
+        b(iN) = b(iN) - solver_c_mc(iLon, jN) * SmallPotentialMC(wrap_lon(iLon+1, nMagLons), 2)
+        b(iN) = b(iN) + solver_c_mc(iLon, jN) * SmallPotentialMC(wrap_lon(iLon-1, nMagLons), 2)
       end if
     end do
   end do
@@ -1891,18 +1902,30 @@ do iLon = 1, nMagLons
   DynamoPotentialMC(iLon, jEq) = x(idxEq(iLon, nPair, nMagLons))
 end do
 
-if (UseSHPoleWrapping) then
-  DynamoPotentialMC(:, 1) = 0.0
-  DynamoPotentialMC(:, nMagLats) = 0.0
-else
+! if (FloatSouth) then
+!   DynamoPotentialMC(:, 1) = 0.0
+!   DynamoPotentialMC(:, nMagLats) = 0.0
+! else
+    ! DynamoPotentialMC(:, 1) = SmallPotentialMC(:, 1)
+  ! DynamoPotentialMC(:, nMagLats) = SmallPotentialMC(:, 2) ! north
+! endif
+
+if (.not. FloatSouth) &
   DynamoPotentialMC(:, 1) = SmallPotentialMC(:, 1)
+if (.not. FloatNorth) &
   DynamoPotentialMC(:, nMagLats) = SmallPotentialMC(:, 2)
-endif
+
+! if (FloatSouth) 
+DynamoPotentialMC(:, 1)        = DynamoPotentialMC(:, 2)
+! if (FloatNorth) 
+DynamoPotentialMC(:, nMagLats) = DynamoPotentialMC(:, nMagLats - 1)
+
 DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :) ! Periodic boundary condition in longitude
 OldPotMC = DynamoPotentialMC ! Save the solution for use as an initial guess in the next time step
 
-DynamoPotentialMC = DynamoPotentialMC - sum(DynamoPotentialMC)/size(DynamoPotentialMC) ! subtract the mean
-! DynamoPotentialMC = DynamoPotentialMC - DynamoPotentialMC(1,iEquator)
+DynamoPotentialMC = DynamoPotentialMC - sum(DynamoPotentialMC) / size(DynamoPotentialMC)
+
+! OldPotMC = DynamoPotentialMC
 
 ! Mirroring NH solution to SH 
 ! do iLat = 2, nMagLats/2
@@ -2244,12 +2267,32 @@ subroutine matvec_raw(x_I, y_I, n)
   real :: a0, b0, c0, d0, e0
   integer :: iOpp
   integer :: iLonP, iLonPE, iLonPW
+  real :: potN, potS
 
   nLatH = nMagLats / 2
   nPair = nLatH - 1
   jEq   = nLatH + 1
 
   y_I = 0.0
+  ! potN = 0.0
+  ! potS = 0.0
+  ! p = 1
+  ! do iLon =1, nMagLons
+  !   iC = idxN(iLon, p+1, nPair)
+  !   potN = potN + x_I(iC)/nMagLons
+  !   iC = idxS(iLon, p+1, nPair)
+  !   potS = potS + x_I(iC)/nMagLons
+  ! enddo
+  ! do iLon =1, nMagLons
+  !   if (FloatNorth) then
+  !     iC = idxN(iLon,p,nPair)
+  !     x_I(iC) = potN
+  !   end if
+  !   if (FloatSouth) then
+  !     iC = idxS(iLon,p,nPair)
+  !     x_I(iC) = potS
+  !   end if
+  ! enddo
 
   do p = 1, nPair
 
@@ -2277,7 +2320,7 @@ subroutine matvec_raw(x_I, y_I, n)
 
       ! old global j-1 direction
       if (p == 1) then
-        if (UseSHPoleWrapping) then
+        if (FloatSouth) then
           iLonP  = wrap_lon(iLon  + nMagLons/2, nMagLons)
           iLonPE = wrap_lon(iLonE + nMagLons/4, nMagLons)
           iLonPW = wrap_lon(iLonW + 3*nMagLons/4, nMagLons)
@@ -2329,9 +2372,19 @@ subroutine matvec_raw(x_I, y_I, n)
 
       ! old global j+1 direction
       if (p == 1) then
-        iJp  = 0
-        iJpE = 0
-        iJpW = 0
+          if (FloatNorth) then
+            iLonP  = wrap_lon(iLon  + nMagLons/2, nMagLons)
+            iLonPE = wrap_lon(iLonE + nMagLons/4, nMagLons)
+            iLonPW = wrap_lon(iLonW + 3*nMagLons/4, nMagLons)
+
+            iJp  = idxN(iLonP,  1, nPair)
+            iJpE = idxN(iLonPE, 1, nPair)
+            iJpW = idxN(iLonPW, 1, nPair)
+          else
+          iJp  = 0
+          iJpE = 0
+          iJpW = 0
+          endif
       else
         iJp  = idxN(iLon,  p - 1, nPair)
         iJpE = idxN(iLonE, p - 1, nPair)
