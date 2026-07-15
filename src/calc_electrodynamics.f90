@@ -115,49 +115,61 @@ contains
 
 end module ModInterleavedIndexing
 !==========================================================================
-module ModInterleavedMatrix
+module ModInterleavedAComponents
   implicit none
   private
-  public :: build_interleaved_matrix, sparse_matvec_interleaved
 
-  integer, allocatable :: Arow(:), Acol(:)
-  real,    allocatable :: Aval(:)
-  integer :: nA = 0
+  public :: build_A_components
+  public :: A0, AE, AW, AJp, AJm, AJpE, AJpW, AJmE, AJmW, Aopp
+  public :: colE, colW, colJp, colJm, colJpE, colJpW, colJmE, colJmW, colOpp
+
+  real, allocatable :: A0(:), AE(:), AW(:), AJp(:), AJm(:)
+  real, allocatable :: AJpE(:), AJpW(:), AJmE(:), AJmW(:), Aopp(:)
+
+  integer, allocatable :: colE(:), colW(:), colJp(:), colJm(:)
+  integer, allocatable :: colJpE(:), colJpW(:), colJmE(:), colJmW(:), colOpp(:)
 
 contains
 
-  subroutine allocate_A(nX)
+  subroutine allocate_A_components(nX)
     implicit none
     integer, intent(in) :: nX
-    integer :: maxA
 
-    maxA = 20*nX
-
-    if (allocated(Arow)) deallocate(Arow, Acol, Aval)
-
-    allocate(Arow(maxA), Acol(maxA), Aval(maxA))
-    nA = 0
-  end subroutine allocate_A
-
-  subroutine addA(r,c,v)
-    implicit none
-    integer, intent(in) :: r,c
-    real,    intent(in) :: v
-
-    if (abs(v) <= 0.0) return
-
-    nA = nA + 1
-    if (nA > size(Aval)) then
-      write(*,*) "ERROR: sparse matrix storage exceeded in addA"
-      stop
+    if (allocated(A0)) then
+      deallocate(A0, AE, AW, AJp, AJm, AJpE, AJpW, AJmE, AJmW, Aopp)
+      deallocate(colE, colW, colJp, colJm, colJpE, colJpW, colJmE, colJmW, colOpp)
     end if
 
-    Arow(nA) = r
-    Acol(nA) = c
-    Aval(nA) = v
-  end subroutine addA
+    allocate(A0(nX), AE(nX), AW(nX), AJp(nX), AJm(nX), &
+             AJpE(nX), AJpW(nX), AJmE(nX), AJmW(nX), Aopp(nX))
 
-  subroutine build_interleaved_matrix(nX)
+    allocate(colE(nX), colW(nX), colJp(nX), colJm(nX), &
+             colJpE(nX), colJpW(nX), colJmE(nX), colJmW(nX), colOpp(nX))
+
+    A0    = 0.0
+    AE    = 0.0
+    AW    = 0.0
+    AJp   = 0.0
+    AJm   = 0.0
+    AJpE  = 0.0
+    AJpW  = 0.0
+    AJmE  = 0.0
+    AJmW  = 0.0
+    Aopp  = 0.0
+
+    colE   = 1
+    colW   = 1
+    colJp  = 1
+    colJm  = 1
+    colJpE = 1
+    colJpW = 1
+    colJmE = 1
+    colJmW = 1
+    colOpp = 1
+
+  end subroutine allocate_A_components
+
+  subroutine build_A_components(nX)
     use ModElectrodynamics
     use ModInterleavedIndexing, only: idxN, idxS, idxEq, wrap_lon
     implicit none
@@ -165,121 +177,53 @@ contains
     integer, intent(in) :: nX
 
     integer :: nLatH, nPair, jEq
-    integer :: p, iLon, iLonE, iLonW, jG
-    integer :: iC, iE, iW, iOpp
-    integer :: iJp, iJm, iJpE, iJpW, iJmE, iJmW
-    real :: a0, b0, c0, d0, e0, gval
+    integer :: p, iLon, iLonE, iLonW
+    integer :: iS, iN, iE
+    integer :: jS, jN, jG
+    real :: aa, b0, c0, d0, e0, gval
 
     nLatH = nMagLats/2
     nPair = nLatH
     jEq   = nLatH + 1
 
-    call allocate_A(nX)
+    call allocate_A_components(nX)
 
     do p = 1, nPair
 
-      ! ------------------------------------------------------------
-      ! Southern hemisphere rows
-      ! p=1 is now the southern high-latitude boundary row j=1
-      ! ------------------------------------------------------------
-      jG = p
+      jS = p
+      jN = nMagLats - p + 1
 
       do iLon = 1, nMagLons
 
         iLonE = wrap_lon(iLon + 1, nMagLons)
         iLonW = wrap_lon(iLon - 1, nMagLons)
 
-        iC = idxS(iLon, p, nPair)
+        iS = idxS(iLon, p, nPair)
+        iN = idxN(iLon, p, nPair)
 
         if (p == 1) then
 
           if (FloatSouth) then
-            ! Floating/Neumann: -phi_boundary + phi_neighbor = 0
-            call addA(iC, iC, -1.0)
-            call addA(iC, idxS(iLon, 2, nPair), 1.0)
+            A0(iS)    = -1.0
+            AJp(iS)   =  1.0
+            colJp(iS) = idxS(iLon, 2, nPair)
           else
-            ! Fixed/Dirichlet: phi_boundary = SmallPotentialMC
-            call addA(iC, iC, 1.0)
+            A0(iS) = 1.0
           end if
-
-        else
-
-          iE   = idxS(iLonE, p, nPair)
-          iW   = idxS(iLonW, p, nPair)
-          iOpp = idxN(iLon,  p, nPair)
-
-          a0 = solver_a_mc(iLon, jG)
-          b0 = solver_b_mc(iLon, jG)
-          c0 = solver_c_mc(iLon, jG)
-          d0 = solver_d_mc(iLon, jG)
-          e0 = solver_e_mc(iLon, jG)
-
-          gval = gamma_y(iLon, p)
-
-          call addA(iC, iC,   -(2.0*a0 + 2.0*b0 + gval))
-          call addA(iC, iE,    a0 + e0)
-          call addA(iC, iW,    a0 - e0)
-          call addA(iC, iOpp,  gval)
-
-          ! SH old j+1 direction: equatorward
-          if (p == nPair) then
-            iJp  = idxEq(iLon,  nPair, nMagLons)
-            iJpE = idxEq(iLonE, nPair, nMagLons)
-            iJpW = idxEq(iLonW, nPair, nMagLons)
-          else
-            iJp  = idxS(iLon,  p + 1, nPair)
-            iJpE = idxS(iLonE, p + 1, nPair)
-            iJpW = idxS(iLonW, p + 1, nPair)
-          end if
-
-          ! SH old j-1 direction: poleward, now includes boundary row
-          iJm  = idxS(iLon,  p - 1, nPair)
-          iJmE = idxS(iLonE, p - 1, nPair)
-          iJmW = idxS(iLonW, p - 1, nPair)
-
-          call addA(iC, iJp,   b0 + d0)
-          call addA(iC, iJpE,  c0)
-          call addA(iC, iJpW, -c0)
-
-          call addA(iC, iJm,   b0 - d0)
-          call addA(iC, iJmE, -c0)
-          call addA(iC, iJmW,  c0)
-
-        end if
-
-      end do
-
-      ! ------------------------------------------------------------
-      ! Northern hemisphere rows
-      ! p=1 is now the northern high-latitude boundary row j=nMagLats
-      ! ------------------------------------------------------------
-      jG = nMagLats - p + 1
-
-      do iLon = 1, nMagLons
-
-        iLonE = wrap_lon(iLon + 1, nMagLons)
-        iLonW = wrap_lon(iLon - 1, nMagLons)
-
-        iC = idxN(iLon, p, nPair)
-
-        if (p == 1) then
 
           if (FloatNorth) then
-            ! Floating/Neumann: -phi_boundary + phi_neighbor = 0
-            call addA(iC, iC, -1.0)
-            call addA(iC, idxN(iLon, 2, nPair), 1.0)
+            A0(iN)    = -1.0
+            AJm(iN)   =  1.0
+            colJm(iN) = idxN(iLon, 2, nPair)
           else
-            ! Fixed/Dirichlet: phi_boundary = SmallPotentialMC
-            call addA(iC, iC, 1.0)
+            A0(iN) = 1.0
           end if
 
         else
 
-          iE   = idxN(iLonE, p, nPair)
-          iW   = idxN(iLonW, p, nPair)
-          iOpp = idxS(iLon,  p, nPair)
+          jG = jS
 
-          a0 = solver_a_mc(iLon, jG)
+          aa = solver_a_mc(iLon, jG)
           b0 = solver_b_mc(iLon, jG)
           c0 = solver_c_mc(iLon, jG)
           d0 = solver_d_mc(iLon, jG)
@@ -287,44 +231,77 @@ contains
 
           gval = gamma_y(iLon, p)
 
-          call addA(iC, iC,   -(2.0*a0 + 2.0*b0 + gval))
-          call addA(iC, iE,    a0 + e0)
-          call addA(iC, iW,    a0 - e0)
-          call addA(iC, iOpp,  gval)
+          A0(iS)   = -(2.0*aa + 2.0*b0 + gval)
+          AE(iS)   =   aa + e0
+          AW(iS)   =   aa - e0
+          AJp(iS)  =   b0 + d0
+          AJm(iS)  =   b0 - d0
+          AJpE(iS) =   c0
+          AJpW(iS) =  -c0
+          AJmE(iS) =  -c0
+          AJmW(iS) =   c0
+          Aopp(iS) =   gval
 
-          ! NH old j+1 direction: poleward, now includes boundary row
-          iJp  = idxN(iLon,  p - 1, nPair)
-          iJpE = idxN(iLonE, p - 1, nPair)
-          iJpW = idxN(iLonW, p - 1, nPair)
+          colE(iS)   = idxS(iLonE, p, nPair)
+          colW(iS)   = idxS(iLonW, p, nPair)
+          colJm(iS)  = idxS(iLon,  p - 1, nPair)
+          colJmE(iS) = idxS(iLonE, p - 1, nPair)
+          colJmW(iS) = idxS(iLonW, p - 1, nPair)
+          colOpp(iS) = idxN(iLon,  p, nPair)
 
-          ! NH old j-1 direction: equatorward
           if (p == nPair) then
-            iJm  = idxEq(iLon,  nPair, nMagLons)
-            iJmE = idxEq(iLonE, nPair, nMagLons)
-            iJmW = idxEq(iLonW, nPair, nMagLons)
+            colJp(iS)  = idxEq(iLon,  nPair, nMagLons)
+            colJpE(iS) = idxEq(iLonE, nPair, nMagLons)
+            colJpW(iS) = idxEq(iLonW, nPair, nMagLons)
           else
-            iJm  = idxN(iLon,  p + 1, nPair)
-            iJmE = idxN(iLonE, p + 1, nPair)
-            iJmW = idxN(iLonW, p + 1, nPair)
+            colJp(iS)  = idxS(iLon,  p + 1, nPair)
+            colJpE(iS) = idxS(iLonE, p + 1, nPair)
+            colJpW(iS) = idxS(iLonW, p + 1, nPair)
           end if
 
-          call addA(iC, iJp,   b0 + d0)
-          call addA(iC, iJpE,  c0)
-          call addA(iC, iJpW, -c0)
+          jG = jN
 
-          call addA(iC, iJm,   b0 - d0)
-          call addA(iC, iJmE, -c0)
-          call addA(iC, iJmW,  c0)
+          aa = solver_a_mc(iLon, jG)
+          b0 = solver_b_mc(iLon, jG)
+          c0 = solver_c_mc(iLon, jG)
+          d0 = solver_d_mc(iLon, jG)
+          e0 = solver_e_mc(iLon, jG)
+
+          gval = gamma_y(iLon, p)
+
+          A0(iN)   = -(2.0*aa + 2.0*b0 + gval)
+          AE(iN)   =   aa + e0
+          AW(iN)   =   aa - e0
+          AJp(iN)  =   b0 + d0
+          AJm(iN)  =   b0 - d0
+          AJpE(iN) =   c0
+          AJpW(iN) =  -c0
+          AJmE(iN) =  -c0
+          AJmW(iN) =   c0
+          Aopp(iN) =   gval
+
+          colE(iN)   = idxN(iLonE, p, nPair)
+          colW(iN)   = idxN(iLonW, p, nPair)
+          colJp(iN)  = idxN(iLon,  p - 1, nPair)
+          colJpE(iN) = idxN(iLonE, p - 1, nPair)
+          colJpW(iN) = idxN(iLonW, p - 1, nPair)
+          colOpp(iN) = idxS(iLon,  p, nPair)
+
+          if (p == nPair) then
+            colJm(iN)  = idxEq(iLon,  nPair, nMagLons)
+            colJmE(iN) = idxEq(iLonE, nPair, nMagLons)
+            colJmW(iN) = idxEq(iLonW, nPair, nMagLons)
+          else
+            colJm(iN)  = idxN(iLon,  p + 1, nPair)
+            colJmE(iN) = idxN(iLonE, p + 1, nPair)
+            colJmW(iN) = idxN(iLonW, p + 1, nPair)
+          end if
 
         end if
 
       end do
-
     end do
 
-    ! ------------------------------------------------------------
-    ! One equator row
-    ! ------------------------------------------------------------
     jG = jEq
 
     do iLon = 1, nMagLons
@@ -332,58 +309,41 @@ contains
       iLonE = wrap_lon(iLon + 1, nMagLons)
       iLonW = wrap_lon(iLon - 1, nMagLons)
 
-      iC = idxEq(iLon,  nPair, nMagLons)
-      iE = idxEq(iLonE, nPair, nMagLons)
-      iW = idxEq(iLonW, nPair, nMagLons)
+      iE = idxEq(iLon, nPair, nMagLons)
 
-      iJp  = idxN(iLon,  nPair, nPair)
-      iJpE = idxN(iLonE, nPair, nPair)
-      iJpW = idxN(iLonW, nPair, nPair)
-
-      iJm  = idxS(iLon,  nPair, nPair)
-      iJmE = idxS(iLonE, nPair, nPair)
-      iJmW = idxS(iLonW, nPair, nPair)
-
-      a0 = solver_a_mc(iLon, jG)
+      aa = solver_a_mc(iLon, jG)
       b0 = solver_b_mc(iLon, jG)
       c0 = solver_c_mc(iLon, jG)
       d0 = solver_d_mc(iLon, jG)
       e0 = solver_e_mc(iLon, jG)
 
-      call addA(iC, iC,  -(2.0*a0 + 2.0*b0))
-      call addA(iC, iE,   a0 + e0)
-      call addA(iC, iW,   a0 - e0)
+      A0(iE)   = -(2.0*aa + 2.0*b0)
+      AE(iE)   =   aa + e0
+      AW(iE)   =   aa - e0
+      AJp(iE)  =   b0 + d0
+      AJm(iE)  =   b0 - d0
+      AJpE(iE) =   c0
+      AJpW(iE) =  -c0
+      AJmE(iE) =  -c0
+      AJmW(iE) =   c0
+      Aopp(iE) =   0.0
 
-      call addA(iC, iJp,   b0 + d0)
-      call addA(iC, iJpE,  c0)
-      call addA(iC, iJpW, -c0)
+      colE(iE)   = idxEq(iLonE, nPair, nMagLons)
+      colW(iE)   = idxEq(iLonW, nPair, nMagLons)
 
-      call addA(iC, iJm,   b0 - d0)
-      call addA(iC, iJmE, -c0)
-      call addA(iC, iJmW,  c0)
+      colJp(iE)  = idxN(iLon,  nPair, nPair)
+      colJpE(iE) = idxN(iLonE, nPair, nPair)
+      colJpW(iE) = idxN(iLonW, nPair, nPair)
+
+      colJm(iE)  = idxS(iLon,  nPair, nPair)
+      colJmE(iE) = idxS(iLonE, nPair, nPair)
+      colJmW(iE) = idxS(iLonW, nPair, nPair)
 
     end do
 
-  end subroutine build_interleaved_matrix
+  end subroutine build_A_components
 
-  subroutine sparse_matvec_interleaved(x_I, y_I, n)
-    implicit none
-
-    integer, intent(in) :: n
-    real, intent(in)    :: x_I(n)
-    real, intent(out)   :: y_I(n)
-
-    integer :: k
-
-    y_I = 0.0
-
-    do k = 1, nA
-      y_I(Arow(k)) = y_I(Arow(k)) + Aval(k)*x_I(Acol(k))
-    end do
-
-  end subroutine sparse_matvec_interleaved
-
-end module ModInterleavedMatrix
+end module ModInterleavedAComponents
 !=========================================================================
 module ModInterleavedSolverHelpers
   implicit none
@@ -400,7 +360,7 @@ contains
 
     integer :: p, iLon, iN, iS, iEq
     integer :: nLatH, nPair, jS, jN, jEq
-    real    :: a0, b0, d0, e0, gval
+    real    :: aa, b0, d0, e0, gval
 
     nLatH = nMagLats / 2
     nPair = nLatH
@@ -445,12 +405,12 @@ contains
           gval = gamma_y(iLon, p)
 
           ! SH row
-          a0 = solver_a_mc(iLon, jS)
+          aa = solver_a_mc(iLon, jS)
           b0 = solver_b_mc(iLon, jS)
           d0 = solver_d_mc(iLon, jS)
           e0 = solver_e_mc(iLon, jS)
 
-          d_lu(iS) = -(2.0*a0 + 2.0*b0 + gval)
+          d_lu(iS) = -(2.0*aa + 2.0*b0 + gval)
           e_lu(iS) = gval
           f_lu(iS) = 0.0
 
@@ -465,22 +425,22 @@ contains
           if (iLon == 1) then
             e2_lu(iS) = 0.0
           else
-            e2_lu(iS) = a0 - e0
+            e2_lu(iS) = aa - e0
           end if
 
           if (iLon == nMagLons) then
             f2_lu(iS) = 0.0
           else
-            f2_lu(iS) = a0 + e0
+            f2_lu(iS) = aa + e0
           end if
 
           ! NH row
-          a0 = solver_a_mc(iLon, jN)
+          aa = solver_a_mc(iLon, jN)
           b0 = solver_b_mc(iLon, jN)
           d0 = solver_d_mc(iLon, jN)
           e0 = solver_e_mc(iLon, jN)
 
-          d_lu(iN) = -(2.0*a0 + 2.0*b0 + gval)
+          d_lu(iN) = -(2.0*aa + 2.0*b0 + gval)
           f_lu(iN) = gval
           e_lu(iN) = 0.0
 
@@ -495,13 +455,13 @@ contains
           if (iLon == 1) then
             e2_lu(iN) = 0.0
           else
-            e2_lu(iN) = a0 - e0
+            e2_lu(iN) = aa - e0
           end if
 
           if (iLon == nMagLons) then
             f2_lu(iN) = 0.0
           else
-            f2_lu(iN) = a0 + e0
+            f2_lu(iN) = aa + e0
           end if
 
         end if
@@ -513,13 +473,13 @@ contains
 
       iEq = idxEq(iLon, nPair, nMagLons)
 
-      a0 = solver_a_mc(iLon, jEq)
+      aa = solver_a_mc(iLon, jEq)
       b0 = solver_b_mc(iLon, jEq)
       e0 = solver_e_mc(iLon, jEq)
 
-      d_lu(iEq) = -(2.0*a0 + 2.0*b0)
-      e_lu(iEq) = a0 - e0
-      f_lu(iEq) = a0 + e0
+      d_lu(iEq) = -(2.0*aa + 2.0*b0)
+      e_lu(iEq) = aa - e0
+      f_lu(iEq) = aa + e0
 
       if (iLon == 1)        e_lu(iEq) = 0.0
       if (iLon == nMagLons) f_lu(iEq) = 0.0
@@ -586,8 +546,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   use ModMagTrace
   use ModInterleavedIndexing, only: idxN, idxS, idxEq, wrap_lon
   use ModInterleavedSolverHelpers, only: build_preconditioner, apply_preconditioner
-  use ModInterleavedMatrix, only: build_interleaved_matrix
-
+  use ModInterleavedAComponents, only: build_A_components
   implicit none
 
   integer, intent(out) :: UAi_nMLTs, UAi_nLats
@@ -2029,7 +1988,11 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     SmallPotentialMC = 0.0
   endif
 
-  ! --------------------------------------------------------------
+  ! Try with zero potential if both boundaries are fixed
+  if (.not. FloatNorth .and. .not. FloatSouth) then
+    SmallPotentialMC = 0.0
+  endif
+    ! --------------------------------------------------------------
 
   call coupling_function(gamma_peak, gamma_min)
 
@@ -2082,7 +2045,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   end do
 
   rhs = b
-call build_interleaved_matrix(nX)
+call build_A_components(nX)
 call build_preconditioner()
 call apply_preconditioner(b)
 
@@ -2149,8 +2112,9 @@ OldPotMC = DynamoPotentialMC
 DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :) ! Periodic boundary condition in longitude
 OldPotMC = DynamoPotentialMC ! Save the solution for use as an initial guess in the next time step
 
-if (FloatNorth .or. FloatSouth) &
-  DynamoPotentialMC = DynamoPotentialMC - sum(DynamoPotentialMC) / size(DynamoPotentialMC)
+! Should I remove the mean from the solution??? NOT SURE yet! 
+! if (FloatNorth .or. FloatSouth) &
+!   DynamoPotentialMC = DynamoPotentialMC - sum(DynamoPotentialMC) / size(DynamoPotentialMC)
 
 ! OldPotMC = DynamoPotentialMC
 
@@ -2464,6 +2428,9 @@ end subroutine UA_calc_electrodynamics
 
 !============================================================================
 subroutine matvec_gitm(x_I, y_I, n)
+  use ModInterleavedAComponents, only: &
+       A0, AE, AW, AJp, AJm, AJpE, AJpW, AJmE, AJmW, Aopp, &
+       colE, colW, colJp, colJm, colJpE, colJpW, colJmE, colJmW, colOpp
   use ModInterleavedSolverHelpers, only: apply_preconditioner
   implicit none
 
@@ -2471,24 +2438,20 @@ subroutine matvec_gitm(x_I, y_I, n)
   real, intent(in)    :: x_I(n)
   real, intent(out)   :: y_I(n)
 
-  call matvec_raw(x_I, y_I, n)
+  y_I = A0*x_I &
+      + AE*x_I(colE) &
+      + AW*x_I(colW) &
+      + AJp*x_I(colJp) &
+      + AJm*x_I(colJm) &
+      + AJpE*x_I(colJpE) &
+      + AJpW*x_I(colJpW) &
+      + AJmE*x_I(colJmE) &
+      + AJmW*x_I(colJmW) &
+      + Aopp*x_I(colOpp)
+
   call apply_preconditioner(y_I)
 
 end subroutine matvec_gitm
-
-!============================================================================
-subroutine matvec_raw(x_I, y_I, n)
-  use ModInterleavedMatrix, only: sparse_matvec_interleaved
-  implicit none
-
-  integer, intent(in) :: n
-  real, intent(in)    :: x_I(n)
-  real, intent(out)   :: y_I(n)
-
-  call sparse_matvec_interleaved(x_I, y_I, n)
-
-end subroutine matvec_raw
-
 !=================================================================================
 subroutine UA_calc_electrodynamics_1d
 
