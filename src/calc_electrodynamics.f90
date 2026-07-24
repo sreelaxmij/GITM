@@ -52,8 +52,8 @@ subroutine coupling_function(gamma_peak, gamma_min)
                     ! gamma_y(iLon, jLocal) = gamma_peak - m * y_eq_to_pole(k)
 
                   ! gamma_y(iLon, jLocal) = gamma_peak - m * (y_eq_to_pole(k) - y_eq_to_pole(1))
-                  
-                  gamma_y(iLon, jLocal) = 1.00
+
+                  gamma_y(iLon, jLocal) = 0.00
               else
                   ! Python: gy_right = np.zeros(...)
                   gamma_y(iLon, jLocal) = 0.00
@@ -203,7 +203,7 @@ contains
 
         if (p == 1) then
 
-          if (FloatSouth) then
+          if (FloatSouth) then ! zero gradient
             A0(iS)    = -1.0
             AJp(iS)   =  1.0
             colJp(iS) = idxS(iLon, 2, nPair)
@@ -211,7 +211,7 @@ contains
             A0(iS) = 1.0
           end if
 
-          if (FloatNorth) then
+          if (FloatNorth) then ! zero gradient
             A0(iN)    = -1.0
             AJm(iN)   =  1.0
             colJm(iN) = idxN(iLon, 2, nPair)
@@ -341,7 +341,7 @@ contains
 
     end do
 
-  end subroutine build_A_components
+  end subroutine build_A_components 
 
 end module ModInterleavedAComponents
 !=========================================================================
