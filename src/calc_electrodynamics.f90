@@ -53,7 +53,7 @@ subroutine coupling_function(gamma_peak, gamma_min)
 
                   ! gamma_y(iLon, jLocal) = gamma_peak - m * (y_eq_to_pole(k) - y_eq_to_pole(1))
 
-                  gamma_y(iLon, jLocal) = 0.00
+                  gamma_y(iLon, jLocal) = 1.00
               else
                   ! Python: gy_right = np.zeros(...)
                   gamma_y(iLon, jLocal) = 0.00
@@ -185,6 +185,12 @@ contains
     nLatH = nMagLats/2
     nPair = nLatH
     jEq   = nLatH + 1
+    ! solver_a_mc = 0.0
+    ! solver_b_mc = 0.0
+    ! solver_c_mc = 0.0
+    ! solver_e_mc = 0.0
+    ! solver_s_mc = 0.0
+    ! gamma_y     = 0.0
 
     call allocate_A_components(nX)
 
@@ -301,6 +307,9 @@ contains
 
       end do
     end do
+  !   write(*,*) 'SH row:', &
+  ! A0(iS), AJp(iS), AJm(iS), &
+  ! ' row sum = ', A0(iS) + AJp(iS) + AJm(iS)
 
     jG = jEq
 
@@ -340,6 +349,12 @@ contains
       colJmW(iE) = idxS(iLonW, nPair, nPair)
 
     end do
+    ! AE = 0.0
+    ! AW = 0.0
+    ! AJpE = 0.0
+    ! AJpW = 0.0
+    ! AJmE = 0.0
+    ! AJmW = 0.0
 
   end subroutine build_A_components 
 
@@ -373,6 +388,12 @@ contains
     f1_lu = 0.0
     e2_lu = 0.0
     f2_lu = 0.0
+    ! solver_a_mc = 0.0
+    ! solver_b_mc = 0.0
+    ! solver_c_mc = 0.0
+    ! solver_e_mc = 0.0
+    ! solver_s_mc = 0.0
+    ! gamma_y     = 0.0
 
     do p = 1, nPair
 
@@ -547,6 +568,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   use ModInterleavedIndexing, only: idxN, idxS, idxEq, wrap_lon
   use ModInterleavedSolverHelpers, only: build_preconditioner, apply_preconditioner
   use ModInterleavedAComponents, only: build_A_components
+  use ModIoUnit, only: UnitTmp_
   implicit none
 
   integer, intent(out) :: UAi_nMLTs, UAi_nLats
@@ -666,6 +688,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     allocate(SmallMagLocTimeMC(nMagLons + 1, 2), &
              SmallMagLatMC(nMagLons + 1, 2), &
              SmallPotentialMC(nMagLons + 1, 2), &
+             SmallFACsMC(nMagLons + 1, 2), &
              stat=iError)
     allocate(gamma_y(nMagLons, nMagLats/2), &
              stat=iError)
@@ -1376,6 +1399,8 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   KpmMC(nMagLons + 1, :) = KpmMC(1, :)
 
   bs = nMagLats*(nMagLons + 1)
+  ! SigmaHallMC = 0
+  ! SigmaPedersenMC = 0
 
   MagBufferMC = DivJuAltMC
   call MPI_AllREDUCE(MagBufferMC, DivJuAltMC, &
@@ -1384,11 +1409,11 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   MagBufferMC = SigmaHallMC
   call MPI_AllREDUCE(MagBufferMC, SigmaHallMC, &
                      bs, MPI_REAL, MPI_MAX, iCommGITM, iError)
-
+! write(*,*), SigmaHallMC
   MagBufferMC = SigmaPedersenMC
   call MPI_AllREDUCE(MagBufferMC, SigmaPedersenMC, &
                      bs, MPI_REAL, MPI_MAX, iCommGITM, iError)
-
+! write(*,*), SigmaPedersenMC
   MagBufferMC = LengthMC
   call MPI_AllREDUCE(MagBufferMC, LengthMC, &
                      bs, MPI_REAL, MPI_MAX, iCommGITM, iError)
@@ -1812,16 +1837,16 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   ! -------------------------------------------------------------------------------------------------------
   ! move to electroydnamics_solver_coefficients():
 
-  solver_a_mc = 4*deltalmc**2*sigmappmc/cos(MagLatMC*pi/180)
-  solver_b_mc = 4*deltapmc**2*cos(MagLatMC*pi/180)*sigmallmc
+  solver_a_mc = 4*deltalmc**2*sigmappmc/max(cos(MagLatMC*pi/180), cos(75.0*pi/180))
+  solver_b_mc = 4*deltapmc**2*max(cos(MagLatMC*pi/180), cos(75.0*pi/180))*sigmallmc
   solver_c_mc = deltalmc*deltapmc*(SigmaPLmc + SigmaLPmc)
 
   solver_d_mc = 2.0*deltalmc*deltapmc**2* &
                 (sign(1.0, MagLatMC)*dSigmaPLdpMC - sin(MagLatMC*pi/180)*sigmallmc &
-                 + cos(MagLatMC*pi/180)*dSigmaLLdlMC)
+                 + max(cos(MagLatMC*pi/180), cos(75.0*pi/180))*dSigmaLLdlMC)
 
   solver_e_mc = 2.0*deltalmc**2*deltapmc*( &
-                dSigmaPPdpMC/cos(MagLatMC*pi/180) + dSigmaLPdlMC*sign(1.0, MagLatMC))
+                dSigmaPPdpMC/max(cos(MagLatMC*pi/180), cos(75.0*pi/180)) + dSigmaLPdlMC*sign(1.0, MagLatMC))
   solver_s_mc = 4*deltalmc**2*deltapmc**2*(RBody)* &
                 (dkdlmdlMC + dKDpmdpMC)
 
@@ -1878,7 +1903,6 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
         dSigmaCowlingdpMC(i, j) = 0.5*(SigmaCowlingMC(i + 1, j) - SigmaCowlingMC(i - 1, j))/deltapmc(i, j)
         dSigmaLLdpMC(i, j) = 0.5*(SigmaLLMC(i + 1, j) - SigmaLLMC(i - 1, j))/deltapmc(i, j)
         dKDlmdpMC(i, j) = 0.5*(KDlmMC(i + 1, j) - KDlmMC(i - 1, j))/deltapmc(i, j)
-
       enddo
       dSigmaCowlingdpMC(1, j) = (SigmaCowlingMC(2, j) - SigmaCowlingMC(1, j))/deltapmc(1, j)
       dSigmaCowlingdpMC(nMagLons + 1, j) = dSigmaCowlingdpMC(1, j)
@@ -1924,10 +1948,27 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
   endif
 
+  ! solver_s_mc = solver_s_mc * cos(MagLatMC*pi/180) *0.0
   ! --------------------------------------------------------------
 
   ! Add this to make sure solver_a never goes below 0
   where (solver_a_mc < 0.001) solver_a_mc = 0.001
+
+  ! if (iProc == 0 .and. .not. IsAWritten) then
+  !   open(unit=UnitTmp_, file="dSigma_gradients.dat", status="replace")
+  !   write(UnitTmp_, '(a)') "iLon iLat MagLon MagLat SigmaLL SigmaPP dSigmaLLdl dSigmaLPdl "// &
+  !     "dSigmaPLdp dSigmaPPdp solverA solverB solverC solverD solverE solverS"
+  !   do i = 1, nMagLons + 1
+  !     do j = 1, nMagLats
+  !       write(UnitTmp_, '(2i5,14e15.6)') i, j, MagLonMC(i, j), MagLatMC(i, j), &
+  !         SigmaLLMC(i, j), SigmaPPMC(i, j), &
+  !         dSigmaLLdlMC(i, j), dSigmaLPdlMC(i, j), dSigmaPLdpMC(i, j), dSigmaPPdpMC(i, j), &
+  !         solver_a_mc(i, j), solver_b_mc(i, j), solver_c_mc(i, j), &
+  !         solver_d_mc(i, j), solver_e_mc(i, j), solver_s_mc(i, j)
+  !     enddo
+  !   enddo
+  !   close(UnitTmp_)
+  ! endif
 
   ! DynamoPotentialMC = 0.0
 
@@ -1987,11 +2028,15 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     !     call stop_gitm("Stopping in calc_electrodynamics")
     SmallPotentialMC = 0.0
   endif
+  ! solver_s_mc = 0.0
+  ! Try with zero potential if both boundaries are fixed ! CAREFULL
+  ! if (.not. FloatNorth .and. .not. FloatSouth) then
+  !   SmallPotentialMC = 0.0
+  ! endif
 
-  ! Try with zero potential if both boundaries are fixed
-  if (.not. FloatNorth .and. .not. FloatSouth) then
-    SmallPotentialMC = 0.0
-  endif
+  ! SmallPotentialMC = 0.0
+  ! SmallPotentialMC = 10.0
+  write(*,*) SmallPotentialMC(1,1), SmallPotentialMC(1,2)
     ! --------------------------------------------------------------
 
   call coupling_function(gamma_peak, gamma_min)
@@ -2053,7 +2098,8 @@ call apply_preconditioner(b)
   call start_timing("dynamo_solver")
  
   MaxIteration = nItersMax      !good enough : 200
-  nIteration = 0
+  nIteration = MaxIteration ! for BICGSTAB
+  ! nIteration = 0 ! for GMRES
   iError = 0
   if (iDebugLevel > 2) then
     DoTestMe = .true.
@@ -2067,18 +2113,22 @@ call apply_preconditioner(b)
   ! call gmres(matvec_gitm, b, x, .true., nX, &
   !            MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe)
 
-  call gmres(matvec_gitm, b, x, .true., nX, & ! false
-           MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe) 
+  ! call gmres(matvec_gitm, b, x, .true., nX, & ! false
+  !          MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe) 
   ! write(*,*) "Starting BiCGSTAB solver...", Residual
   
-  ! call bicgstab(matvec_gitm,b,x,.true.,nX,Residual,'abs',nIteration,iError,DoTestMe)
-
+  call bicgstab(matvec_gitm,b,x,.true.,nX,Residual,'abs',nIteration,iError,DoTestMe)
   if (iProc == 0) then
-    ! write(*,*), Residual
-    write(*, *) "GMRES finished with error code: ", iError
-    write(*, *) "GMRES finished with residual: ", Residual
-    write(*, *) "Iteration", nIteration
-  endif
+    write(*,*) 'BiCGSTAB error code:', iError
+    write(*,*) 'BiCGSTAB residual:', Residual
+    write(*,*) 'BiCGSTAB iterations:', nIteration
+  end if
+  ! if (iProc == 0) then
+  !   ! write(*,*), Residual
+  !   write(*, *) "GMRES finished with error code: ", iError
+  !   write(*, *) "GMRES finished with residual: ", Residual
+  !   write(*, *) "Iteration", nIteration
+  ! endif
 
   call end_timing("dynamo_solver")
 
@@ -2106,17 +2156,29 @@ do iLon = 1, nMagLons
   DynamoPotentialMC(iLon, jEq) = x(idxEq(iLon, nPair, nMagLons))
 end do
 
-DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :)
-OldPotMC = DynamoPotentialMC
-
 DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :) ! Periodic boundary condition in longitude
 OldPotMC = DynamoPotentialMC ! Save the solution for use as an initial guess in the next time step
+if (iProc==0) then
+  do j=1,nMagLats
+    write(*,*) j, MagLatMC(2, j), DynamoPotentialMC(2, j)
+  end do
+endif
+! if (iProc == 0 .and. .not. IsAWritten) then
+!   open(unit=UnitTmp_, file="dynamo_potential.dat", status="replace")
+!   write(UnitTmp_, '(a)') "iLon iLat MagLon MagLat DynamoPotential SigmaPedersen SigmaHall"
+!   do i = 1, nMagLons + 1
+!     do j = 1, nMagLats
+!       write(UnitTmp_, '(2i5,5e15.6)') i, j, MagLonMC(i, j), MagLatMC(i, j), &
+!         DynamoPotentialMC(i, j), SigmaPedersenMC(i, j), SigmaHallMC(i, j)
+!     enddo
+!   enddo
+!   close(UnitTmp_)
+!   IsAWritten = .true.
+! endif
 
 ! Should I remove the mean from the solution??? NOT SURE yet! 
 ! if (FloatNorth .or. FloatSouth) &
 !   DynamoPotentialMC = DynamoPotentialMC - sum(DynamoPotentialMC) / size(DynamoPotentialMC)
-
-! OldPotMC = DynamoPotentialMC
 
 ! Mirroring NH solution to SH 
 ! do iLat = 2, nMagLats/2

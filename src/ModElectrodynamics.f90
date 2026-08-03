@@ -24,6 +24,7 @@ module ModElectrodynamics
   ! logical :: UseSHPoleWrapping = .false.
   logical :: FloatNorth = .false.
   logical :: FloatSouth = .false.
+  logical, save :: IsAWritten = .false.
 
   ! This is the field aligned integral in magnetic coordinates
   real, dimension(:, :), allocatable :: DivJuAltMC
@@ -78,7 +79,7 @@ module ModElectrodynamics
  real :: gamma_peak = 100.0, gamma_min = 25.0 ! 100 and 25
 
   real, dimension(:, :), allocatable :: &
-    SmallMagLocTimeMC, SmallMagLatMC, SmallPotentialMC
+    SmallMagLocTimeMC, SmallMagLatMC, SmallPotentialMC, SmallFACsMC
 
   integer :: nMagLats = 140  ! 1 degrees 140
   integer :: nMagLons = 90  ! 4 degrees

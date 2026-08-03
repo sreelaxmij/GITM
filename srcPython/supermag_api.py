@@ -234,11 +234,11 @@ def sm_GetUrl(fetchurl,fetch='raw'):
     #with urllib.request.urlopen(fetchurl,cafile=certifi.where()) as response:
     # note that 'cafile' is deprecated past python 3.5 but we keep it here
     # to have stronger backward compatability with earlier versions
-    try:
-      cafile=certifi.where()
-    except:
-      cafile=''
-    with urllib.request.urlopen(fetchurl,cafile=cafile) as response:
+#     try:
+#       cafile=certifi.where()
+#     except:
+#       cafile=''
+    with urllib.request.urlopen(fetchurl) as response:
       longstring = response.read()
 
       if fetch == 'json':
