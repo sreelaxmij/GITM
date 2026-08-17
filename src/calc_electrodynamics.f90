@@ -33,7 +33,7 @@ subroutine coupling_function(gamma_peak, gamma_min)
           ! Target latitude (deg) for the coupling cutoff: 65 deg +/- some deg by longitude.
           ! Converted to a k-index using MagLatRes so the cutoff tracks actual latitude
           ! regardless of grid resolution (k=1 is near equator, k=nMagHemiLats is the pole).
-          latTargetDeg = 65.0 + real(nMagLons) * cos(2.0 * pi * real(iLon - 1) / 180.0) / 15.0
+          latTargetDeg = 55.0 !+ real(nMagLons) * cos(2.0 * pi * real(iLon - 1) / 180.0) / 15.0 !! Include the wave according to MLT - TODO
           indr = int(latTargetDeg / MagLatRes)
           indr = max(1, min(indr, nMagHemiLats))
 
@@ -53,7 +53,7 @@ subroutine coupling_function(gamma_peak, gamma_min)
 
                   ! gamma_y(iLon, jLocal) = gamma_peak - m * (y_eq_to_pole(k) - y_eq_to_pole(1))
 
-                  gamma_y(iLon, jLocal) = 1.00
+                  gamma_y(iLon, jLocal) = 1.0
               else
                   ! Python: gy_right = np.zeros(...)
                   gamma_y(iLon, jLocal) = 0.00
@@ -688,7 +688,9 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     allocate(SmallMagLocTimeMC(nMagLons + 1, 2), &
              SmallMagLatMC(nMagLons + 1, 2), &
              SmallPotentialMC(nMagLons + 1, 2), &
-             SmallFACsMC(nMagLons + 1, 2), &
+             FACsMC(nMagLons + 1, nMagLats), &
+             FAC_comp(nMagLons + 1, nMagLats), &
+             wind_driven_comp(nMagLons + 1, nMagLats), &
              stat=iError)
     allocate(gamma_y(nMagLons, nMagLats/2), &
              stat=iError)
@@ -739,6 +741,8 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     DynamoPotentialMC = 0.0
     OldPotMC = 0.0
     gamma_y = 0.0
+    FAC_comp = 0.0
+    wind_driven_comp = 0.0
 
     if (iError /= 0) then
       call stop_gitm("Error allocating array DivJuAltMC")
@@ -1850,6 +1854,12 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   solver_s_mc = 4*deltalmc**2*deltapmc**2*(RBody)* &
                 (dkdlmdlMC + dKDpmdpMC)
 
+  ! if (iProc == 0) then
+  !   do j = 1, nMagLats
+  !     write(*,*), deltalmc(2, j), deltapmc(2,j), KDpmMC(2,j) ,dKDlmdlMC(2,j), KpmMC(2,j), dKDpmdpMC(2,j), solver_s_mc(2,j)
+  !   enddo
+  ! endif
+
   !  if (iProc == 0) then
   !
   !     do i= 1,nMagLons
@@ -1948,6 +1958,8 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
   endif
 
+  wind_driven_comp = solver_s_mc
+
   ! solver_s_mc = solver_s_mc * cos(MagLatMC*pi/180) *0.0
   ! --------------------------------------------------------------
 
@@ -2017,10 +2029,11 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   iError = 0
   ! Save previous solution for use as an initial guess in the solver
   SmallPotentialMC = 0.0
-
-  if (.not. FloatNorth .or. .not. FloatSouth) then
-      call ieModel_%get_potential(SmallPotentialMC)
-  endif
+  ! if (.not. FACsOn) then
+    if (.not. FloatNorth .or. .not. FloatSouth) then
+        call ieModel_%get_potential(SmallPotentialMC)
+    endif
+  ! endif
 
   if (iError /= 0) then
     write(*, *) "Error in routine calc_electrodynamics (UA_GetPotential):"
@@ -2034,12 +2047,54 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   !   SmallPotentialMC = 0.0
   ! endif
 
-  ! SmallPotentialMC = 0.0
+  ! if (FACsOn) then
+  !   SmallPotentialMC = 0.0
+  ! endif
   ! SmallPotentialMC = 10.0
-  write(*,*) SmallPotentialMC(1,1), SmallPotentialMC(1,2)
-    ! --------------------------------------------------------------
+  ! write(*,*) SmallPotentialMC(1,1), SmallPotentialMC(1,2)
 
+  ! --------------------------------------------------------------
+  FACsMC = 0.0
+
+  if (FACsOn) then
+    if (ieModel_%iAurora_ == iAmieAur_) then
+        call ieModel_%nMlts(nMagLons + 1)
+        call ieModel_%nLats(nMagLats)
+        call ieModel_%grid(MagLocTimeMC, MagLatMC)
+        call ieModel_%get_FACs(FACsMC)
+        FACsMC(nMagLons + 1, :) = FACsMC(1, :)
+
+    endif
+    ! write(*,*) "FAC min/max = ", minval(FACsMC), maxval(FACsMC)
+  endif
+    ! --------------------------------------------------------------
+!   write(*,*) 'FAC raw max >=60 = ', &
+!   maxval(abs(FACsMC), mask=abs(MagLatMC) >= 60.0)
+
+! write(*,*) 'FAC equivalent A/m >=60 = ', &
+!   maxval(abs(RBody*cos(MagLatMC*pi/180.0) * &
+!              FACsMC*1.0e-6), &
+!          mask=abs(MagLatMC) >= 60.0)
+
+! write(*,*) 'WIND equivalent A/m >=60 = ', &
+!   maxval(abs(dkdlmdlMC + dKDpmdpMC), &
+!          mask=abs(MagLatMC) >= 60.0)
+
+  ! write(*,*), RBody, FACsMC(2,1)
   call coupling_function(gamma_peak, gamma_min)
+  ! solver_s_mc = 0.0
+
+  FAC_comp = 4.0*deltalmc**2*deltapmc**2*RBody**2*max(cos(MagLatMC*pi/180.0),cos(89.0*pi/180.0))* &
+    (FACsMC*1.0e-6)
+
+  solver_s_mc = solver_s_mc + FAC_comp
+
+  solver_s_mc(nMagLons + 1, :) = solver_s_mc(1, :)
+  ! if (iProc ==0) then
+  !    do j=1,nMagLats
+  !     write(*,*) j, MagLatMC(2, j), FAC_comp(2, j), wind_driven_comp(2,j), solver_s_mc(2,j)
+  !   end do
+  ! endif
 
   do p = 1, nPair
 
@@ -2158,11 +2213,12 @@ end do
 
 DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :) ! Periodic boundary condition in longitude
 OldPotMC = DynamoPotentialMC ! Save the solution for use as an initial guess in the next time step
-if (iProc==0) then
-  do j=1,nMagLats
-    write(*,*) j, MagLatMC(2, j), DynamoPotentialMC(2, j)
-  end do
-endif
+! if (iProc==0) then
+!   do j=1,nMagLats
+!     write(*,*) j, MagLatMC(2, j), DynamoPotentialMC(2, j)
+!   end do
+! endif
+
 ! if (iProc == 0 .and. .not. IsAWritten) then
 !   open(unit=UnitTmp_, file="dynamo_potential.dat", status="replace")
 !   write(UnitTmp_, '(a)') "iLon iLat MagLon MagLat DynamoPotential SigmaPedersen SigmaHall"

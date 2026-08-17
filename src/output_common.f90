@@ -353,7 +353,7 @@ subroutine output(dir, iBlock, iOutputType)
 
   case ('2DMEL')
 
-    nvars_to_write = 29
+    nvars_to_write = 32
     if (iBLK == 1) call output_2dmel(iBlock)
 
   case ('2DUSR')
@@ -744,7 +744,9 @@ contains
       write(iOutputUnit_, "(I7,A1,a)") 27, " ", "Ed2new"
       write(iOutputUnit_, "(I7,A1,a)") 28, " ", "Kphi"
       write(iOutputUnit_, "(I7,A1,a)") 29, " ", "Klamda"
-
+      write(iOutputUnit_, "(I7,A1,a)") 30, " ", "FieldAlignedCurrent"
+      write(iOutputUnit_, "(I7,A1,a)") 31, " ", "FAC_component"
+      write(iOutputUnit_, "(I7,A1,a)") 32, " ", "Wind_driven_component"
     endif
 
     if (cType(3:5) == "ALL" .or. cType(3:5) == "NEU") then
@@ -1800,7 +1802,10 @@ subroutine output_2dmel(iBlock)
         Ed1new(iLon, iLat), &
         Ed2new(iLon, iLat), &
         kpmMC(iLon, iLat), &
-        klmMC(iLon, iLat)
+        klmMC(iLon, iLat), &
+        FACsMC(iLon, iLat), &
+        FAC_comp(iLon, iLat), &
+        wind_driven_comp(iLon, iLat)
     enddo
   enddo
 
