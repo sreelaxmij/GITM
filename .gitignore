@@ -63,3 +63,7 @@ util/component_util
 
 src/.version
 gitstatus.txt
+srcData/Examples/swmf20110805N.bin
+srcData/Examples/swmf20110805S.bin
+.gitignore
+.DS_Store

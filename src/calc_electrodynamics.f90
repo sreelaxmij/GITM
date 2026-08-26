@@ -1843,11 +1843,11 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
   solver_a_mc = 4*deltalmc**2*sigmappmc/max(cos(MagLatMC*pi/180), cos(75.0*pi/180))
   solver_b_mc = 4*deltapmc**2*max(cos(MagLatMC*pi/180), cos(75.0*pi/180))*sigmallmc
-  solver_c_mc = deltalmc*deltapmc*(SigmaPLmc + SigmaLPmc)
+  solver_c_mc = sign(1.0, MagLatMC)* deltalmc*deltapmc*(SigmaPLmc + SigmaLPmc)
 
-  solver_d_mc = 2.0*deltalmc*deltapmc**2* &
-                (sign(1.0, MagLatMC)*dSigmaPLdpMC - sin(MagLatMC*pi/180)*sigmallmc &
-                 + max(cos(MagLatMC*pi/180), cos(75.0*pi/180))*dSigmaLLdlMC)
+  solver_d_mc = 2.0*deltalmc*sign(1.0, MagLatMC)*deltapmc**2* &
+                (dSigmaPLdpMC - sign(1.0, MagLatMC)*sin(MagLatMC*pi/180)*sigmallmc &
+                 + sign(1.0, MagLatMC)* max(cos(MagLatMC*pi/180), cos(75.0*pi/180))*dSigmaLLdlMC)
 
   solver_e_mc = 2.0*deltalmc**2*deltapmc*( &
                 dSigmaPPdpMC/max(cos(MagLatMC*pi/180), cos(75.0*pi/180)) + dSigmaLPdlMC*sign(1.0, MagLatMC))
@@ -2152,7 +2152,7 @@ call apply_preconditioner(b)
 
   call start_timing("dynamo_solver")
  
-  MaxIteration = nItersMax      !good enough : 200
+  MaxIteration = max(nItersMax,2000)      !good enough : 200
   nIteration = MaxIteration ! for BICGSTAB
   ! nIteration = 0 ! for GMRES
   iError = 0
