@@ -28,7 +28,7 @@ module ModElectrodynamics
   logical :: FACsOn = .true.
 
   ! This is the field aligned integral in magnetic coordinates
-  real, dimension(:, :), allocatable :: DivJuAltMC
+  real, dimension(:, :), allocatable :: DivJuFieldLineMC
 
   ! These are the conductances in magnetic coordinates
   real, dimension(:, :), allocatable :: SigmaHallMC
