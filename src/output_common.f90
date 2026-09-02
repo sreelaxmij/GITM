@@ -1814,8 +1814,12 @@ subroutine output_2dmel(iBlock)
 
   integer, intent(in) :: iBlock
   integer :: iAlt, iLat, iLon
+  real :: minAlt
   !--------------------------------------------------------------------------
 
+  ! Outputs need altitude, fill it with GITM's minAlt. Altitude_GB is not defined
+  ! on the Mag-Grid
+  minAlt = minval(Altitude_GB(1:nLons, 1:nLats, 1:nAlts, iBlock))
   iAlt = 1
   do iLat = 1, nMagLats
     do iLon = 1, nMagLons + 1
@@ -1823,6 +1827,8 @@ subroutine output_2dmel(iBlock)
         MagLonMC(iLon, iLat)*Pi/180.0, &
         MagLatMC(iLon, iLat)*Pi/180.0, &
         Altitude_GB(1, 1, 1, iBlock), &
+        minAlt, &
+        MagLocTimeMC(iLon, iLat), &
         MagLocTimeMC(iLon, iLat), &
         GeoLatMC(iLon, iLat), &
         GeoLonMC(iLon, iLat), &
