@@ -193,13 +193,13 @@ subroutine get_potential(iBlock)
       TempFAC2d = 0.0
 
       call iemodel_%get_potential(TempPotential2d)
-      
+
       ! if (iAlt == 1) then
       !    call iemodel_%get_FACs(TempFAC2d)
       !   !  write(*,*) 'DEBUG GITM FAC min/max = ', &
       !   !       minval(TempFAC2d), maxval(TempFAC2d)
       ! endif
-      
+
       TempPotential(:, :, 1) = TempPotential2d
       MagnetosphericPotential(:, :, iAlt) = TempPotential2d
 
