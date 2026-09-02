@@ -82,11 +82,10 @@ module ModElectrodynamics
   real, dimension(:, :), allocatable :: &
     SmallMagLocTimeMC, SmallMagLatMC, SmallPotentialMC, FACsMC, FAC_comp, wind_driven_comp
 
-  integer :: nMagLats = 140  ! 1 degrees 140
-  integer :: nMagLons = 90  ! 4 degrees
+  integer :: nMagLats, nMagLons  ! Calculated automatically
+  ! Set the resolution of the magnetic grid with these
   real :: MagLatRes = 0.5
   real :: MagLonRes = 4.0
-  integer :: nMagHemiLats = 91
   logical :: IsInitialized = .false.
 
   !----------------------------------------------------------------------
