@@ -684,15 +684,12 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
              DynamoPotentialMC(nMagLons + 1, nMagLats), &
              Ed1new(nMagLons + 1, nMagLats), Ed2new(nMagLons + 1, nMagLats), &
              OldPotMC(nMagLons + 1, nMagLats), &
-             stat=iError)
-
-    allocate(SmallMagLocTimeMC(nMagLons + 1, 2), &
-             SmallMagLatMC(nMagLons + 1, 2), &
-             SmallPotentialMC(nMagLons + 1, 2), &
+             FullPotentialMC(nMagLons + 1, nMagLats), &
              FACsMC(nMagLons + 1, nMagLats), &
              FAC_comp(nMagLons + 1, nMagLats), &
              wind_driven_comp(nMagLons + 1, nMagLats), &
              stat=iError)
+
     allocate(gamma_y(nMagLons, nMagLats/2), &
              stat=iError)
 
@@ -2021,38 +2018,20 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   ! --------------------------------------------------------------
   ! move to electrodynamics_set_fixed_BCs():
 
-  ! call UA_SetnMLTs(nMagLons + 1)
   call ieModel_%nMlts(nMagLons + 1)
-  call ieModel_%nLats(2)
-  ! call UA_SetnLats(2)
-
-  SmallMagLocTimeMC(:, 1) = MagLocTimeMC(:, 1)
-  SmallMagLocTimeMC(:, 2) = MagLocTimeMC(:, nMagLats)
-  SmallMagLatMC(:, 1) = MagLatMC(:, 1)
-  SmallMagLatMC(:, 2) = MagLatMC(:, nMagLats)
-  iError = 0
-  ! call UA_SetGrid(SmallMagLocTimeMC, SmallMagLatMC, iError)
-  call ieModel_%grid(SmallMagLocTimeMC, SmallMagLatMC)
-  if (iError /= 0) then
-    write(*, *) "Error in routine calc_electrodynamics (UA_SetGrid):"
-    write(*, *) iError
-    call stop_gitm("Stopping in calc_electrodynamics")
-  endif
+  call ieModel_%nLats(nMagLats)
+  call ieModel_%grid(MagLocTimeMC, MagLatMC)
 
   iError = 0
-  ! Save previous solution for use as an initial guess in the solver
-  SmallPotentialMC = 0.0
-  ! if (.not. FACsOn) then
+  FullPotentialMC = 0.0
+
     if (.not. FloatNorth .or. .not. FloatSouth) then
-        call ieModel_%get_potential(SmallPotentialMC)
+    call ieModel_%get_potential(FullPotentialMC)
     endif
-  ! endif
 
   if (iError /= 0) then
     write(*, *) "Error in routine calc_electrodynamics (UA_GetPotential):"
     write(*, *) iError
-    !     call stop_gitm("Stopping in calc_electrodynamics")
-    SmallPotentialMC = 0.0
   endif
 ! solver_s_mc = 0.0
   ! Try with zero potential if both boundaries are fixed ! CAREFULL
@@ -2124,16 +2103,16 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
           b(iS) = 0.0
           x(iS) = OldPotMC(iLon, jS)
         else
-          b(iS) = SmallPotentialMC(iLon, 1)
-          x(iS) = SmallPotentialMC(iLon, 1)
+          b(iS) = FullPotentialMC(iLon, nMagLats)
+          x(iS) = FullPotentialMC(iLon, nMagLats)
         end if
 
         if (FloatNorth) then
           b(iN) = 0.0
           x(iN) = OldPotMC(iLon, jN)
         else
-          b(iN) = SmallPotentialMC(iLon, 2)
-          x(iN) = SmallPotentialMC(iLon, 2)
+          b(iN) = FullPotentialMC(iLon, nMagLats)
+          x(iN) = FullPotentialMC(iLon, nMagLats)
         end if
 
       else

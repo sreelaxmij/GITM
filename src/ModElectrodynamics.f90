@@ -80,7 +80,7 @@ module ModElectrodynamics
  real :: gamma_peak = 100.0, gamma_min = 25.0 ! 100 and 25
 
   real, dimension(:, :), allocatable :: &
-    SmallMagLocTimeMC, SmallMagLatMC, SmallPotentialMC, FACsMC, FAC_comp, wind_driven_comp
+    FullPotentialMC, FACsMC, FAC_comp, wind_driven_comp
 
   integer :: nMagLats, nMagLons  ! Calculated automatically
   ! Set the resolution of the magnetic grid with these
