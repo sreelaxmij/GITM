@@ -2049,15 +2049,9 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   FACsMC = 0.0
 
   if (FACsOn) then
-    if (ieModel_%iAurora_ == iAmieAur_) then
-        call ieModel_%nMlts(nMagLons + 1)
-        call ieModel_%nLats(nMagLats)
-        call ieModel_%grid(MagLocTimeMC, MagLatMC)
+
         call ieModel_%get_FACs(FACsMC)
         FACsMC(nMagLons + 1, :) = FACsMC(1, :)
-
-    endif
-    ! write(*,*) "FAC min/max = ", minval(FACsMC), maxval(FACsMC)
   endif
     ! --------------------------------------------------------------
 !   write(*,*) 'FAC raw max >=60 = ', &
