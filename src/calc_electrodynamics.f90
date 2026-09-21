@@ -2098,8 +2098,8 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
           b(iS) = 0.0
           x(iS) = OldPotMC(iLon, jS)
         else
-          b(iS) = FullPotentialMC(iLon, nMagLats)
-          x(iS) = FullPotentialMC(iLon, nMagLats)
+          b(iS) = FullPotentialMC(iLon, 1)
+          x(iS) = FullPotentialMC(iLon, 1)
         endif
 
         if (FloatNorth) then
