@@ -121,6 +121,7 @@ subroutine get_potential(iBlock)
   use ModElectrodynamics, only: IEModel_
   use ModIndicesInterfaces
   use ModMpi
+  use ModIoUnit, only: UnitTmp_
 
   implicit none
 
@@ -589,7 +590,7 @@ subroutine get_dynamo_potential(lons, lats, pot)
 
           if (LatIn < -88.0) then
             IsFound = .true.
-            pot(iLon, iLat) = sum(DynamoPotentialMC(:, 0))/(nMagLons + 1)
+            pot(iLon, iLat) = sum(DynamoPotentialMC(:, 1))/(nMagLons + 1)
           endif
 
           write(*, *) "Inside the low latitude, but can't find the point!"
