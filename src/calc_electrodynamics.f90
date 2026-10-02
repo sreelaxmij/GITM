@@ -39,14 +39,11 @@ subroutine coupling_function(gamma_peak, gamma_min)
     indr = max(1, min(indr, nMagHemiLats))
 
     ! Python: m = (gamma_peak - gamma_min) / (y_m[indr] - y_m[0] + 1e-30)
-    ! m = (gamma_peak - gamma_min) / (y_eq_to_pole(indr) + 1.0e-30)
     m = (gamma_peak - gamma_min)/(y_eq_to_pole(indr) - y_eq_to_pole(1) + 1.0e-30)
 
     do k = 1, nMagHemiLats
       ! Map 'k' back to the preconditioner's jLocal (Pole to Equator)
       jLocal = nMagHemiLats - k + 1
-      ! gamma_y(iLon, jLocal) = 0.01
-
       if (k <= indr) then
         ! Python: gy_left = gamma_peak - m * (y_m[:indr+1] - y_m[0])
         ! gamma_y(iLon, jLocal) = gamma_peak - m * y_eq_to_pole(k)
@@ -185,12 +182,6 @@ contains
     nLatH = nMagLats/2
     nPair = nLatH
     jEq = nLatH + 1
-    ! solver_a_mc = 0.0
-    ! solver_b_mc = 0.0
-    ! solver_c_mc = 0.0
-    ! solver_e_mc = 0.0
-    ! solver_s_mc = 0.0
-    ! gamma_y     = 0.0
 
     call allocate_A_components(nX)
 
@@ -307,9 +298,6 @@ contains
 
       enddo
     enddo
-    !   write(*,*) 'SH row:', &
-    ! A0(iS), AJp(iS), AJm(iS), &
-    ! ' row sum = ', A0(iS) + AJp(iS) + AJm(iS)
 
     jG = jEq
 
@@ -349,12 +337,6 @@ contains
       colJmW(iE) = idxS(iLonW, nPair, nPair)
 
     enddo
-    ! AE = 0.0
-    ! AW = 0.0
-    ! AJpE = 0.0
-    ! AJpW = 0.0
-    ! AJmE = 0.0
-    ! AJmW = 0.0
 
   end subroutine build_A_components
 
@@ -388,12 +370,6 @@ contains
     f1_lu = 0.0
     e2_lu = 0.0
     f2_lu = 0.0
-    ! solver_a_mc = 0.0
-    ! solver_b_mc = 0.0
-    ! solver_c_mc = 0.0
-    ! solver_e_mc = 0.0
-    ! solver_s_mc = 0.0
-    ! gamma_y     = 0.0
 
     do p = 1, nPair
 
@@ -1613,13 +1589,6 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   iOff = 8.0/MagLatRes
   iEnd = iOff
 
-  !  do iLat = iOff, nMagLats/4
-  !     if ( SigmaHHMC(iLonNoon, iEquator + iLat) + &
-  !          SigmaHHMC(iLonNoon, iEquator - iLat) > &
-  !          SigmaHHMC(iLonNoon, iEquator + iEnd) + &
-  !          SigmaHHMC(iLonNoon, iEquator - iEnd)) iEnd = iLat
-  !  enddo
-
   iStart = iEquator - iEnd
   iEnd = iEquator + iEnd
 
@@ -1640,13 +1609,6 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   iOff = 8.0/MagLatRes
   iEnd = iOff
 
-  !  do iLat = iOff, nMagLats/4
-  !     if ( SigmaLLMC(iLonNoon, iEquator + iLat) + &
-  !          SigmaLLMC(iLonNoon, iEquator - iLat) > &
-  !          SigmaLLMC(iLonNoon, iEquator + iEnd) + &
-  !          SigmaLLMC(iLonNoon, iEquator - iEnd)) iEnd = iLat
-  !  enddo
-
   iStart = iEquator - iEnd
   iEnd = iEquator + iEnd
 
@@ -1665,12 +1627,6 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   iOff = 2.0/MagLatRes
   iOff = 8.0/MagLatRes
   iEnd = iOff
-  !  do iLat = iOff, nMagLats/4
-  !     if ( abs(SigmaPPMC(iLonNoon, iEquator + iLat)) + &
-  !          abs(SigmaPPMC(iLonNoon, iEquator - iLat)) > &
-  !          abs(SigmaPPMC(iLonNoon, iEquator + iEnd)) + &
-  !          abs(SigmaPPMC(iLonNoon, iEquator - iEnd))) iEnd = iLat
-  !  enddo
 
   do i = 1, nMagLons + 1
     do j = iStart + 1, iEquator - 1
@@ -1690,13 +1646,6 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     SigmaCCMC(i, j) = 0.9*(SigmaCCMC(i, j - 1) + SigmaCCMC(i, j + 1))/2.0
     SigmaPLMC(i, j) = -(sigmahhmc(i, j) - sigmaccmc(i, j))
     SigmaLPMC(i, j) = +(sigmahhmc(i, j) + sigmaccmc(i, j))
-
-    !     do j= 1,nMagLats
-    !        if (isnan(SigmaPPMC(i,j))) write(*,*) 'sigmapp is nan : ',i,j
-    !        if (isnan(SigmaCCMC(i,j))) write(*,*) 'sigmacc is nan : ',i,j
-    !        if (isnan(SigmaPLMC(i,j))) write(*,*) 'sigmapl is nan : ',i,j
-    !        if (isnan(SigmaLPMC(i,j))) write(*,*) 'sigmalp is nan : ',i,j
-    !     enddo
 
   enddo
 
@@ -1735,12 +1684,6 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   iOff = 2.0/MagLatRes
   iOff = 8.0/MagLatRes
   iEnd = iOff
-  !  do iLat = iOff, nMagLats/4
-  !     if ( abs(KDlmMC(iLonNoon, iEquator + iLat)) + &
-  !          abs(KDlmMC(iLonNoon, iEquator - iLat)) > &
-  !          abs(KDlmMC(iLonNoon, iEquator + iEnd)) + &
-  !          abs(KDlmMC(iLonNoon, iEquator - iEnd))) iEnd = iLat
-  !  enddo
 
   iStart = iEquator - iEnd
   iEnd = iEquator + iEnd
@@ -1762,12 +1705,6 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   iOff = 2.0/MagLatRes
   iOff = 8.0/MagLatRes
   iEnd = iOff
-  !  do iLat = iOff, nMagLats/4
-  !     if ( abs(KDpmMC(iLonNoon, iEquator + iLat)) + &
-  !          abs(KDpmMC(iLonNoon, iEquator - iLat)) > &
-  !          abs(KDpmMC(iLonNoon, iEquator + iEnd)) + &
-  !          abs(KDpmMC(iLonNoon, iEquator - iEnd))) iEnd = iLat
-  !  enddo
 
   ! In this case, iEnd may need to be set to something like 15 deg
 
@@ -1863,43 +1800,6 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   solver_s_mc = 4*deltalmc**2*deltapmc**2*(RBody)* &
                 (dkdlmdlMC + dKDpmdpMC)
 
-  ! if (iProc == 0) then
-  !   do j = 1, nMagLats
-  !     write(*,*), deltalmc(2, j), deltapmc(2,j), KDpmMC(2,j) ,dKDlmdlMC(2,j), &
-  !                  KpmMC(2,j), dKDpmdpMC(2,j), solver_s_mc(2,j)
-  !   enddo
-  ! endif
-
-  !  if (iProc == 0) then
-  !
-  !     do i= 1,nMagLons
-  !        do j= 1,nMagLats
-  !
-  !           if (isnan(deltalmc(i,j))) write(*,*) 'deltalmc is nan : ',i,j
-  !           if (isnan(deltapmc(i,j))) write(*,*) 'deltapmc is nan : ',i,j
-  !           if (isnan(dSigmaPLdpMC(i,j))) write(*,*) 'dSigmaPLdpMC is nan : ',i,j
-  !           if (isnan(sigmallmc(i,j))) write(*,*) 'sigmallmc is nan : ',i,j
-  !           if (isnan(dSigmaLLdlMC(i,j))) write(*,*) 'dSigmaLLdlMC is nan : ',i,j
-  !
-  !           if (isnan(solver_a_mc(i,j))) write(*,*) 'solver_a_mc is nan : ',i,j
-  !           if (isnan(solver_b_mc(i,j))) write(*,*) 'solver_b_mc is nan : ',i,j
-  !           if (isnan(solver_c_mc(i,j))) write(*,*) 'solver_c_mc is nan : ',i,j
-  !           if (isnan(solver_d_mc(i,j))) write(*,*) 'solver_d_mc is nan : ',i,j
-  !           if (isnan(solver_d_mc(i,j))) write(*,*) 'solver_d_mc is nan : ',i,j, solver_d_mc(i,j)
-  !           if (isnan(solver_d_mc(i,j))) write(*,*) 'solver_d_mc is nan : ',i,j, deltalmc(i,j)
-  !           if (isnan(solver_d_mc(i,j))) write(*,*) 'solver_d_mc is nan : ',i,j, deltapmc(i,j)
-  !           if (isnan(solver_d_mc(i,j))) write(*,*) 'solver_d_mc is nan : ',i,j,sigmallmc(i,j)
-  !           if (isnan(solver_d_mc(i,j))) write(*,*) 'solver_d_mc is nan : ',i,j,dSigmaPLdpMC(i,j)
-  !           if (isnan(solver_d_mc(i,j))) write(*,*) 'solver_d_mc is nan : ',i,j,dSigmaLLdlMC(i,j)
-  !
-  !
-  !           if (isnan(solver_e_mc(i,j))) write(*,*) 'solver_e_mc is nan : ',i,j
-  !           if (isnan(solver_s_mc(i,j))) write(*,*) 'solver_s_mc is nan : ',i,j
-  !        enddo
-  !     enddo
-  !
-  !  endif
-
   ! Do the cowling conductivity within +/- 6 deg of equator
 
   ! ------------------------------------------------------------------------------
@@ -1977,22 +1877,6 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   ! Add this to make sure solver_a never goes below 0
   where (solver_a_mc < 0.001) solver_a_mc = 0.001
 
-  ! if (iProc == 0 .and. .not. IsAWritten) then
-  !   open(unit=UnitTmp_, file="dSigma_gradients.dat", status="replace")
-  !   write(UnitTmp_, '(a)') "iLon iLat MagLon MagLat SigmaLL SigmaPP dSigmaLLdl dSigmaLPdl "// &
-  !     "dSigmaPLdp dSigmaPPdp solverA solverB solverC solverD solverE solverS"
-  !   do i = 1, nMagLons + 1
-  !     do j = 1, nMagLats
-  !       write(UnitTmp_, '(2i5,14e15.6)') i, j, MagLonMC(i, j), MagLatMC(i, j), &
-  !         SigmaLLMC(i, j), SigmaPPMC(i, j), &
-  !         dSigmaLLdlMC(i, j), dSigmaLPdlMC(i, j), dSigmaPLdpMC(i, j), dSigmaPPdpMC(i, j), &
-  !         solver_a_mc(i, j), solver_b_mc(i, j), solver_c_mc(i, j), &
-  !         solver_d_mc(i, j), solver_e_mc(i, j), solver_s_mc(i, j)
-  !     enddo
-  !   enddo
-  !   close(UnitTmp_)
-  ! endif
-
   ! DynamoPotentialMC = 0.0
 
   ! Fill in the diagonal vectors
@@ -2030,42 +1914,25 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     call ieModel_%get_potential(FullPotentialMC)
   endif
 
+  ! if (iProc == 0) write(*,*) 'BC S/N:', &
+  !   minval(FullPotentialMC(:,1)),        maxval(FullPotentialMC(:,1)), &
+  !   minval(FullPotentialMC(:,nMagLats)), maxval(FullPotentialMC(:,nMagLats))
+
+
   if (iError /= 0) then
     write(*, *) "Error in routine calc_electrodynamics (UA_GetPotential):"
     write(*, *) iError
   endif
 ! solver_s_mc = 0.0
-  ! Try with zero potential if both boundaries are fixed ! CAREFULL
-  ! if (.not. FloatNorth .and. .not. FloatSouth) then
-  !   SmallPotentialMC = 0.0
-  ! endif
-
-  ! if (FACsOn) then
-  !   SmallPotentialMC = 0.0
-  ! endif
-  ! SmallPotentialMC = 10.0
-  ! write(*,*) SmallPotentialMC(1,1), SmallPotentialMC(1,2)
 
   ! --------------------------------------------------------------
   FACsMC = 0.0
 
   if (FACsOn) then
-
     call ieModel_%get_FACs(FACsMC)
     FACsMC(nMagLons + 1, :) = FACsMC(1, :)
   endif
   ! --------------------------------------------------------------
-!   write(*,*) 'FAC raw max >=60 = ', &
-!   maxval(abs(FACsMC), mask=abs(MagLatMC) >= 60.0)
-
-! write(*,*) 'FAC equivalent A/m >=60 = ', &
-!   maxval(abs(RBody*cos(MagLatMC*pi/180.0) * &
-!              FACsMC*1.0e-6), &
-!          mask=abs(MagLatMC) >= 60.0)
-
-! write(*,*) 'WIND equivalent A/m >=60 = ', &
-!   maxval(abs(dkdlmdlMC + dKDpmdpMC), &
-!          mask=abs(MagLatMC) >= 60.0)
 
   ! write(*,*), RBody, FACsMC(2,1)
   call coupling_function(gamma_peak, gamma_min)
@@ -2147,28 +2014,17 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     DoTestMe = .false.
   endif
 
-  Residual = MaxResidual    !! Residual = 1.0 iterations required ~ 103
-             !! with Residual=0.01,only 20 more iterations are required (~ 122)
+  Residual = MaxResidual
 
   ! call gmres(matvec_gitm, b, x, .true., nX, &
   !            MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe)
 
-  ! call gmres(matvec_gitm, b, x, .true., nX, & ! false
-  !          MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe)
-  ! write(*,*) "Starting BiCGSTAB solver...", Residual
-
-  call bicgstab(matvec_gitm, b, x, .true., nX, Residual, 'abs', nIteration, iError, DoTestMe)
+  call bicgstab(matvec_gitm, b, x, .true., nX, Residual, 'rel', nIteration, iError, DoTestMe)
   if (iProc == 0) then
     write(*, *) 'BiCGSTAB error code:', iError
     write(*, *) 'BiCGSTAB residual:', Residual
     write(*, *) 'BiCGSTAB iterations:', nIteration
   endif
-  ! if (iProc == 0) then
-  !   ! write(*,*), Residual
-  !   write(*, *) "GMRES finished with error code: ", iError
-  !   write(*, *) "GMRES finished with residual: ", Residual
-  !   write(*, *) "Iteration", nIteration
-  ! endif
 
   call end_timing("dynamo_solver")
 
@@ -2197,37 +2053,10 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
   DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :) ! Periodic boundary condition in longitude
   OldPotMC = DynamoPotentialMC ! Save the solution for use as an initial guess in the next time step
-! if (iProc==0) then
-!   do j=1,nMagLats
-!     write(*,*) j, MagLatMC(2, j), DynamoPotentialMC(2, j)
-!   end do
-! endif
-
-! if (iProc == 0 .and. .not. IsAWritten) then
-!   open(unit=UnitTmp_, file="dynamo_potential.dat", status="replace")
-!   write(UnitTmp_, '(a)') "iLon iLat MagLon MagLat DynamoPotential SigmaPedersen SigmaHall"
-!   do i = 1, nMagLons + 1
-!     do j = 1, nMagLats
-!       write(UnitTmp_, '(2i5,5e15.6)') i, j, MagLonMC(i, j), MagLatMC(i, j), &
-!         DynamoPotentialMC(i, j), SigmaPedersenMC(i, j), SigmaHallMC(i, j)
-!     enddo
-!   enddo
-!   close(UnitTmp_)
-!   IsAWritten = .true.
-! endif
 
 ! Should I remove the mean from the solution??? NOT SURE yet!
 ! if (FloatNorth .or. FloatSouth) &
 !   DynamoPotentialMC = DynamoPotentialMC - sum(DynamoPotentialMC) / size(DynamoPotentialMC)
-
-! Mirroring NH solution to SH
-! do iLat = 2, nMagLats/2
-!   do iLon = 1, nMagLons
-!     iI = nMagLats - iLat + 1
-!     DynamoPotentialMC(iLon, iLat) = OldPotMC(iLon, iI)
-!   end do
-! end do
-! DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :)
 
   if (allocated(b)) deallocate(x, y, b, rhs, d_lu, e_lu, f_lu, e1_lu, f1_lu, e2_lu, f2_lu)
 
