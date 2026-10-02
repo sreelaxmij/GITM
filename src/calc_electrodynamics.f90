@@ -615,6 +615,12 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   call report("UA_calc_electrodynamics", 1)
   call start_timing("calc_electrodyn")
 
+  if (CosTestSetup) then
+    ! Clean test case: both poles fixed
+    FloatNorth = .false.
+    FloatSouth = .false.
+  endif
+
   if (FloatNorth .and. FloatSouth) &
     call stop_gitm("calc_electrodynamics: FloatNorth and FloatSouth cannot both be .true.")
 
