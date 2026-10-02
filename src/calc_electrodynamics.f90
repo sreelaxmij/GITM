@@ -588,6 +588,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
   real :: residual, oldresidual, a, tmp
   real :: poleMeanS, poleMeanN
+  real, allocatable :: cosNS(:, :), sinNS(:, :), cosEW(:, :)
 
   logical :: IsDone, IsFirstTime = .true., DoTestMe, Debug = .False.
 
@@ -1683,6 +1684,24 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   where (SigmaPLMC < 0.001) SigmaPLMC = 0.001
   where (SigmaLPMC > -0.001) SigmaLPMC = -0.001
 
+  ! TEST: constant Pedersen and Hall conductances
+  ! SigmaPPMC = 1.0
+  ! SigmaLLMC = 1.0
+  ! SigmaHHMC = 1.0   ! Hall
+  ! SigmaCCMC = 0.0
+  ! SigmaPLMC = 1.0   ! Hall 
+  ! SigmaLPMC = -1.0   ! Hall
+
+  if (CosTestSetup) then
+    ! Uniform Pedersen conductance, no Hall terms
+    SigmaPPMC = 1.0
+    SigmaLLMC = 1.0
+    SigmaHHMC = 0.0
+    SigmaCCMC = 0.0
+    SigmaPLMC = 0.0
+    SigmaLPMC = 0.0
+  endif
+
   !==========
   ! KDlmMC
 
@@ -1792,17 +1811,42 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   ! -------------------------------------------------------------------------------------------------------
   ! move to electroydnamics_solver_coefficients():
 
-  solver_a_mc = 4*deltalmc**2*sigmappmc/max(cos(MagLatMC*pi/180), cos(75.0*pi/180))
-  solver_b_mc = 4*deltapmc**2*max(cos(MagLatMC*pi/180), cos(75.0*pi/180))*sigmallmc
+  ! cosNS/sinNS enter the north-south terms (solver_b, solver_d), and cosEW the
+  ! east-west terms (solver_a, solver_e).  sinNS is -d(cosNS)/dlat, so the two
+  ! must be changed together.  MetricTest = 0 is the baseline.
+  allocate(cosNS(nMagLons + 1, nMagLats), sinNS(nMagLons + 1, nMagLats), &
+           cosEW(nMagLons + 1, nMagLats))
+  cosNS = cos(MagLatMC*pi/180)
+  sinNS = sin(MagLatMC*pi/180)
+  cosEW = cos(MagLatMC*pi/180)
+  select case (MetricTest)
+  case (1)
+    cosNS = 1.0
+    sinNS = 0.0
+  case (2)
+    cosEW = 1.0
+  case (3)
+    where (cosNS < cos(75.0*pi/180))
+      cosNS = cos(75.0*pi/180)
+      sinNS = 0.0
+    endwhere
+    cosEW = max(cosEW, cos(75.0*pi/180))
+  end select
+  if (iProc == 0 .and. (MetricTest /= 0 .or. CosTestSetup)) &
+    write(*, *) 'Cos test: MetricTest =', MetricTest, '  CosTestSetup =', CosTestSetup
+
+  solver_a_mc = 4*deltalmc**2*sigmappmc/cosEW
+  solver_b_mc = 4*deltapmc**2*cosNS*sigmallmc
   solver_c_mc = sign(1.0, MagLatMC)*deltalmc*deltapmc*(SigmaPLmc + SigmaLPmc)
 
   solver_d_mc = 2.0*deltalmc*sign(1.0, MagLatMC)*deltapmc**2* &
-                (dSigmaPLdpMC - sign(1.0, MagLatMC)*sin(MagLatMC*pi/180)*sigmallmc &
-                 + sign(1.0, MagLatMC)*max(cos(MagLatMC*pi/180), cos(75.0*pi/180))*dSigmaLLdlMC)
+                (dSigmaPLdpMC - sign(1.0, MagLatMC)*sinNS*sigmallmc &
+                 + sign(1.0, MagLatMC)*cosNS*dSigmaLLdlMC)
 
   solver_e_mc = 2.0*deltalmc**2*deltapmc*( &
-                dSigmaPPdpMC/max(cos(MagLatMC*pi/180), cos(75.0*pi/180)) + dSigmaLPdlMC*sign(1.0, MagLatMC))
+                dSigmaPPdpMC/cosEW + dSigmaLPdlMC*sign(1.0, MagLatMC))
   solver_s_mc = 4*deltalmc**2*deltapmc**2*(RBody)* &
+                !cos(MagLatMC*pi/180)*&
                 (dkdlmdlMC + dKDpmdpMC)
 
   ! Do the cowling conductivity within +/- 6 deg of equator
@@ -1941,7 +1985,8 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
   ! write(*,*), RBody, FACsMC(2,1)
   call coupling_function(gamma_peak, gamma_min)
-  ! solver_s_mc = 0.0
+  if (CosTestSetup) gamma_y = 0.0   ! no interhemispheric coupling in the test
+  solver_s_mc = 0.0
 
   FAC_comp = 4.0*deltalmc**2*deltapmc**2*RBody**2*max(cos(MagLatMC*pi/180.0), cos(89.0*pi/180.0))* &
              (FACsMC*1.0e-6)
