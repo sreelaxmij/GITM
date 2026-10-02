@@ -200,7 +200,8 @@ contains
 
         if (p == 1) then
 
-          if (FloatSouth) then ! zero gradient
+          if (FloatSouth .or. &
+              (PinSinglePoint .and. FloatNorth .and. iLon /= 1)) then ! zero gradient
             A0(iS) = -1.0
             AJp(iS) = 1.0
             colJp(iS) = idxS(iLon, 2, nPair)
@@ -208,7 +209,8 @@ contains
             A0(iS) = 1.0
           endif
 
-          if (FloatNorth) then ! zero gradient
+          if (FloatNorth .or. &
+              (PinSinglePoint .and. FloatSouth .and. iLon /= 1)) then ! zero gradient
             A0(iN) = -1.0
             AJm(iN) = 1.0
             colJm(iN) = idxN(iLon, 2, nPair)
@@ -383,14 +385,16 @@ contains
 
         if (p == 1) then
 
-          if (FloatSouth) then
+          if (FloatSouth .or. &
+              (PinSinglePoint .and. FloatNorth .and. iLon /= 1)) then
             d_lu(iS) = -1.0
             f1_lu(iS) = 1.0
           else
             d_lu(iS) = 1.0
           endif
 
-          if (FloatNorth) then
+          if (FloatNorth .or. &
+              (PinSinglePoint .and. FloatSouth .and. iLon /= 1)) then
             d_lu(iN) = -1.0
             f1_lu(iN) = 1.0
           else
@@ -583,6 +587,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   real :: aLat, aLon, gLat, gLon, Date, sLat, sLon, gLatMC, gLonMC
 
   real :: residual, oldresidual, a, tmp
+  real :: poleMeanS, poleMeanN
 
   logical :: IsDone, IsFirstTime = .true., DoTestMe, Debug = .False.
 
@@ -1950,6 +1955,11 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   !   end do
   ! endif
 
+  ! If needed, pin at a single point (iLon = 1) to its ring mean; the rest of that
+  ! ring floats.  With both poles fixed, the full ring values are used.
+  poleMeanS = sum(FullPotentialMC(1:nMagLons, 1))/nMagLons
+  poleMeanN = sum(FullPotentialMC(1:nMagLons, nMagLats))/nMagLons
+
   do p = 1, nPair
 
     jS = p
@@ -1961,17 +1971,25 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
       if (p == 1) then
 
-        if (FloatSouth) then
+        if (FloatSouth .or. &
+            (PinSinglePoint .and. FloatNorth .and. iLon /= 1)) then
           b(iS) = 0.0
           x(iS) = OldPotMC(iLon, jS)
+        else if (PinSinglePoint .and. FloatNorth) then
+          b(iS) = poleMeanS
+          x(iS) = poleMeanS
         else
           b(iS) = FullPotentialMC(iLon, 1)
           x(iS) = FullPotentialMC(iLon, 1)
         endif
 
-        if (FloatNorth) then
+        if (FloatNorth .or. &
+            (PinSinglePoint .and. FloatSouth .and. iLon /= 1)) then
           b(iN) = 0.0
           x(iN) = OldPotMC(iLon, jN)
+        else if (PinSinglePoint .and. FloatSouth) then
+          b(iN) = poleMeanN
+          x(iN) = poleMeanN
         else
           b(iN) = FullPotentialMC(iLon, nMagLats)
           x(iN) = FullPotentialMC(iLon, nMagLats)
@@ -2057,6 +2075,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 ! Should I remove the mean from the solution??? NOT SURE yet!
 ! if (FloatNorth .or. FloatSouth) &
 !   DynamoPotentialMC = DynamoPotentialMC - sum(DynamoPotentialMC) / size(DynamoPotentialMC)
+
 
   if (allocated(b)) deallocate(x, y, b, rhs, d_lu, e_lu, f_lu, e1_lu, f1_lu, e2_lu, f2_lu)
 

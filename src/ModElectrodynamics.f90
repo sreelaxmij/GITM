@@ -24,6 +24,7 @@ module ModElectrodynamics
   ! logical :: UseSHPoleWrapping = .false.
   logical :: FloatNorth = .false.
   logical :: FloatSouth = .false.
+  logical :: PinSinglePoint = .false.
   logical, save :: IsAWritten = .false.
   logical :: FACsOn = .true.
 
