@@ -2084,9 +2084,14 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   endif
 
   Residual = MaxResidual
-
-  ! call gmres(matvec_gitm, b, x, .true., nX, &
-  !            MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe)
+  if (useGmres) then
+  call gmres(matvec_gitm, b, x, .true., nX, &
+               MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe)
+  else
+    nIteration = MaxIteration
+    call bicgstab(matvec_gitm, b, x, .true., nX, &
+                  Residual, 'abs', nIteration, iError, DoTestMe)
+  endif
 
   call bicgstab(matvec_gitm, b, x, .true., nX, Residual, 'rel', nIteration, iError, DoTestMe)
   if (iProc == 0) then
