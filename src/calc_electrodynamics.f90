@@ -2090,10 +2090,9 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   else
     nIteration = MaxIteration
     call bicgstab(matvec_gitm, b, x, .true., nX, &
-                  Residual, 'abs', nIteration, iError, DoTestMe)
+                  Residual, 'rel', nIteration, iError, DoTestMe)
   endif
 
-  call bicgstab(matvec_gitm, b, x, .true., nX, Residual, 'rel', nIteration, iError, DoTestMe)
   if (iProc == 0) then
     write(*, *) 'BiCGSTAB error code:', iError
     write(*, *) 'BiCGSTAB residual:', Residual
