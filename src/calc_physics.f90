@@ -116,7 +116,7 @@ subroutine calc_physics(iBlock)
   LocalTime = mod((UTime/(RotationPeriodInput/24.0) + &
                    Longitude(:, iBlock)*24.0/TwoPi), 24.0)
 
-  if (UseApex) &
+  if (IsEarth) &
     call SUBSOLR(iTimeArray(1), iJulianDay, iTimeArray(4), &
                  iTimeArray(5), iTimeArray(6), SubsolarLatitude, &
                  SubsolarLongitude)
@@ -127,7 +127,7 @@ subroutine calc_physics(iBlock)
     ! Compute Magnetic Local Time
     !
 
-    if (UseApex .and. IsEarth) then
+    if (IsEarth) then
       do iLat = -1, nLats + 2
         do iLon = -1, nLons + 2
           call magloctm( &
