@@ -121,7 +121,7 @@ module ModInputs
   logical :: DoRestart = .false.
 
   integer :: iAltTest = -1
-  integer :: iDebugLevel = 1
+  integer :: iDebugLevel = 0
   logical :: UseBarriers = .false.
   logical :: DoCheckForNans = .false.
   integer :: nSteps = 10
