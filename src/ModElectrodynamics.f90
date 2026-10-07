@@ -29,6 +29,7 @@ module ModElectrodynamics
   integer :: MetricTest = 0 ! 0,1,2,3
   logical, save :: IsAWritten = .false.
   logical :: FACsOn = .true.
+  logical :: BalanceFACs = .true.
 
   ! This is the field aligned integral in magnetic coordinates
   real, dimension(:, :), allocatable :: DivJuFieldLineMC

@@ -588,6 +588,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
   real :: residual, oldresidual, a, tmp
   real :: poleMeanS, poleMeanN
+  real :: facUp, facDown, facScaleUp, facScaleDown
   real, allocatable :: cosNS(:, :), sinNS(:, :), cosEW(:, :)
 
   logical :: IsDone, IsFirstTime = .true., DoTestMe, Debug = .False.
@@ -595,7 +596,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   integer :: iLm, iLp, jLat, iI, MaxIteration, nIteration, iLonNoon
   integer :: nX
   integer :: nTot
-  integer :: iStart, iEnd, iAve
+  integer :: iStart, iEnd, iAve, iHemi
 
   logical :: UseNewTrace = .false.
 
@@ -1978,28 +1979,66 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     write(*, *) "Error in routine calc_electrodynamics (UA_GetPotential):"
     write(*, *) iError
   endif
-! solver_s_mc = 0.0
+  ! solver_s_mc = 0.0
 
   ! --------------------------------------------------------------
   FACsMC = 0.0
 
-  if (FACsOn) then
-    call ieModel_%get_FACs(FACsMC)
-    FACsMC(nMagLons + 1, :) = FACsMC(1, :)
+  if (.not. CosTestSetup) then
+    if (FACsOn) then
+      call ieModel_%get_FACs(FACsMC)
+      FACsMC(nMagLons + 1, :) = FACsMC(1, :)
+      where (abs(MagLatMC) > FACCapCutoff) FACsMC = 0.0
+      if (BalanceFACs) then
+        ! Per hemisphere: scale up and down currents to their average magnitude,
+        ! keeping the pattern shape but removing the net (area-weighted) current.
+        do iHemi = -1, 1, 2 ! -1  SH, +1 NH
+          facUp = 0.0
+          facDown = 0.0
+          ! Rows 1 and nMagLats are boundary rows (no equation), so skip them
+          do j = 2, nMagLats - 1
+            if (MagLatMC(1, j)*iHemi <= 0.0) cycle ! skip the other hemisphere and the equator
+            do i = 1, nMagLons
+              tmp = FACsMC(i, j)*cos(MagLatMC(i, j)*pi/180.0)*deltalmc(i, j)*deltapmc(i, j)
+              if (tmp > 0.0) then
+                facUp = facUp + tmp  ! total upward FAC in this hemisphere
+              else
+                facDown = facDown - tmp ! total downward FAC in this hemisphere
+              endif
+            enddo
+          enddo
+          if (facUp > 0.0 .and. facDown > 0.0) then
+            facScaleUp = 0.5*(facUp + facDown)/facUp
+            facScaleDown = 0.5*(facUp + facDown)/facDown
+            if (iProc == 0 .and. iDebugLevel > 0) &
+              write(*, *) 'BalanceFACs hemi, up/down ratio:', iHemi, facUp/facDown
+            do j = 1, nMagLats
+              if (MagLatMC(1, j)*iHemi <= 0.0) cycle
+              where (FACsMC(:, j) > 0.0)
+                FACsMC(:, j) = FACsMC(:, j)*facScaleUp
+              elsewhere
+                FACsMC(:, j) = FACsMC(:, j)*facScaleDown
+              endwhere
+            enddo
+          endif
+        enddo
+      endif
+    endif
   endif
   ! --------------------------------------------------------------
-
-  ! write(*,*), RBody, FACsMC(2,1)
   call coupling_function(gamma_peak, gamma_min)
   if (CosTestSetup) gamma_y = 0.0   ! no interhemispheric coupling in the test
-  solver_s_mc = 0.0
-
-  FAC_comp = 4.0*deltalmc**2*deltapmc**2*RBody**2*max(cos(MagLatMC*pi/180.0), cos(89.0*pi/180.0))* &
-             (FACsMC*1.0e-6)
-
-  solver_s_mc = solver_s_mc + FAC_comp
-
-  solver_s_mc(nMagLons + 1, :) = solver_s_mc(1, :)
+  
+  if (CosTestSetup) then
+    solver_s_mc = 0.0 ! No source term in the test
+  else
+    FAC_comp = 4.0*deltalmc**2*deltapmc**2*RBody**2* &
+              cos(MagLatMC*pi/180.0)* &
+              !max(cos(MagLatMC*pi/180.0), cos(89.0*pi/180.0))* &
+              (FACsMC*1.0e-6)
+    solver_s_mc = solver_s_mc + FAC_comp
+    solver_s_mc(nMagLons + 1, :) = solver_s_mc(1, :)
+  end if
   ! if (iProc ==0) then
   !    do j=1,nMagLats
   !     write(*,*) j, MagLatMC(2, j), FAC_comp(2, j), wind_driven_comp(2,j), solver_s_mc(2,j)
