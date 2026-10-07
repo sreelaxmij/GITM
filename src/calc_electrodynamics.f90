@@ -1356,7 +1356,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
           SigmaHHMC(i, j) = shh
           SigmaCCMC(i, j) = scc
-          if (MagLatMC(i, j) > 0.0) then
+          if (MagLatMC(i, j) >= 0.0) then ! >= b/c equator should also be in the north
             SigmaPLMC(i, j) = +(shh - scc)
             SigmaLPMC(i, j) = -(shh + scc)
           else
