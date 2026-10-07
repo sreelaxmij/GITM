@@ -1923,11 +1923,11 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
         solver_a_mc(i, j) = &
           4*deltalmc(i, j)**2*(SigmaCowlingMC(i, j))/ &
-          cos(MagLatMC(i, j)*pi/180)
+          cosEW(i, j)
 
         solver_c_mc(i, j) = &
           deltalmc(i, j)*deltapmc(i, j)* &
-          SigmaLPMC(i, j)
+          sign(1.0, MagLatMC(i, j))*SigmaLPMC(i, j)
 
         solver_d_mc(i, j) = solver_d_mc(i, j) &
                             - sign(1.0, MagLatMC(i, j)) &
@@ -1937,7 +1937,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
         solver_e_mc(i, j) = 2.0*deltalmc(i, j)**2* &
                             deltapmc(i, j)*( &
                             dSigmaCowlingdpMC(i, j)/ &
-                            cos(MagLatMC(i, j)*pi/180) + dSigmaLPdlMC(i, j)*sign(1.0, MagLatMC(i, j)))
+                            cosEW(i, j) + dSigmaLPdlMC(i, j)*sign(1.0, MagLatMC(i, j)))
 
         solver_s_mc(i, j) = &
           solver_s_mc(i, j) + 4*deltalmc(i, j)**2* &
