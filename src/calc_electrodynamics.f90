@@ -1727,7 +1727,12 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     do j = iEnd - 1, iEquator + 1, -1
       KDlmMC(i, j) = 0.92*KDlmMC(i, j + 1)
     enddo
-    KDlmMC(i, iEquator) = 0.92*(KDlmMC(i, iEquator - 1) + KDlmMC(i, iEquator + 1))/2
+    if (FixKDEquator) then
+      ! KDlmMC is poleward-positive in both hemispheres; to get the evrage, sign needs to change in SH 
+      KDlmMC(i, iEquator) = 0.92*(KDlmMC(i, iEquator + 1) - KDlmMC(i, iEquator - 1))/2
+    else
+      KDlmMC(i, iEquator) = 0.92*(KDlmMC(i, iEquator - 1) + KDlmMC(i, iEquator + 1))/2
+    endif
 
   enddo
 
@@ -1798,6 +1803,21 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
   enddo
 
+  if (FixKDEquator) then
+    ! The formula above is right only when KDlmMC(j-1), (j) and (j+1) use the
+    ! same convention.  KDlmMC is poleward-positive: southward in SH, northward in NH.  
+    ! Near equator it is wrong; redo them with the neighbour from the other side converted (sign flipped).
+    j = iEquator        ! NH: southern neighbour : -KDlmMC(j-1)
+    dkdlmdlMC(:, j) = cos(MagLatMC(:, j)*pi/180)* &
+                      0.5*(KDlmMC(:, j + 1) + KDlmMC(:, j - 1))/deltalmc(:, j) &
+                      - sin(MagLatMC(:, j)*pi/180)*KDlmMC(:, j)
+    j = iEquator - 1    ! SH: equator neighbour : -KDlmMC(j+1)
+    ! (original: cos*0.5*(K(j+1)-K(j-1))/(dl*sign) - sign*sin*K, with sign = -1)
+    dkdlmdlMC(:, j) = cos(MagLatMC(:, j)*pi/180)* &
+                      0.5*(KDlmMC(:, j + 1) + KDlmMC(:, j - 1))/deltalmc(:, j) &
+                      + sin(MagLatMC(:, j)*pi/180)*KDlmMC(:, j)
+  endif
+
   do j = 1, nMagLats
     do i = 2, nMagLons
       dSigmaPLdpMC(i, j) = 0.5*(SigmaPLMC(i + 1, j) - SigmaPLMC(i - 1, j))/deltapmc(i, j)
@@ -1809,7 +1829,12 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     dSigmaPLdpMC(nMagLons + 1, j) = dSigmaPLdpMC(1, j)
     dSigmaPPdpMC(1, j) = (SigmaPPMC(2, j) - SigmaPPMC(1, j))/deltapmc(1, j)
     dSigmaPPdpMC(nMagLons + 1, j) = dSigmaPPdpMC(1, j)
-    dKDpmdpMC(1, j) = (KDpmMC(2, j) - KDpmMC(1, j))/deltapmc(1, j)
+    if (FixKDEquator) then
+      ! Periodic central difference (column nMagLons is the western neighbour)
+      dKDpmdpMC(1, j) = 0.5*(KDpmMC(2, j) - KDpmMC(nMagLons, j))/deltapmc(1, j)
+    else
+      dKDpmdpMC(1, j) = (KDpmMC(2, j) - KDpmMC(1, j))/deltapmc(1, j)
+    endif
     dKDpmdpMC(nMagLons + 1, j) = dKDpmdpMC(1, j)
     dKpmdpMC(1, j) = (KpmMC(2, j) - KpmMC(1, j))/deltapmc(1, j)
     dKpmdpMC(nMagLons + 1, j) = dKpmdpMC(1, j)

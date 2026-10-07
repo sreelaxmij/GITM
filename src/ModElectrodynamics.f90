@@ -30,6 +30,8 @@ module ModElectrodynamics
   logical, save :: IsAWritten = .false.
   logical :: FACsOn = .true.
   logical :: BalanceFACs = .true.
+  logical :: FixKDEquator = .true.
+  ! TEST: FACs poleward of this |MLat| - zero
 
   ! This is the field aligned integral in magnetic coordinates
   real, dimension(:, :), allocatable :: DivJuFieldLineMC
