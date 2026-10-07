@@ -1641,6 +1641,9 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   iOff = 8.0/MagLatRes
   iEnd = iOff
 
+  iStart = iEquator - iEnd
+  iEnd = iEquator + iEnd
+
   do i = 1, nMagLons + 1
     do j = iStart + 1, iEquator - 1
       SigmaPPMC(i, j) = 0.9*SigmaPPMC(i, j - 1)
