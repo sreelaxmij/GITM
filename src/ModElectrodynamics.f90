@@ -25,7 +25,7 @@ module ModElectrodynamics
   logical :: FloatNorth = .false.
   logical :: FloatSouth = .false.
   logical :: PinSinglePoint = .false.
-  logical :: CosTestSetup = .true.
+  logical :: CosTestSetup = .false.
   integer :: MetricTest = 0 ! 0,1,2,3
   logical, save :: IsAWritten = .false.
   logical :: FACsOn = .true.

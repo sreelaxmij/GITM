@@ -1668,7 +1668,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   do i = 1, nMagLons + 1
     do j = 1, iEquator - 1    ! Southern hemisphere
 
-      k = nMagLats - j + 1     ! Mirror point in the Northern hemisphere
+      ! k = nMagLats - j + 1     ! Mirror point in the Northern hemisphere
 
       ! SigmaLLMC(i, j) = SigmaLLMC(i, j) + SigmaLLMC(i, k)
       ! SigmaPPMC(i, j) = SigmaPPMC(i, j) + SigmaPPMC(i, k)

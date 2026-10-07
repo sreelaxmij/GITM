@@ -617,9 +617,10 @@ subroutine get_dynamo_potential(lons, lats, pot)
           pot(iLon, iLat) = sum(DynamoPotentialMC(1:nMagLons, 1))/nMagLons
         else
           write(*, *) "=====> Could not find point : ", &
-          LatIn, LonIn, DynamoHighLatBoundary, &
-          MagLatMC(nMagLons, nMagLats)
-        pot(iLon, iLat) = 0.0
+            LatIn, LonIn, DynamoHighLatBoundary, &
+            MagLatMC(nMagLons, nMagLats)
+          pot(iLon, iLat) = 0.0
+        endif
       endif
 
     enddo
