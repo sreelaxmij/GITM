@@ -2138,8 +2138,6 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   call start_timing("dynamo_solver")
 
   MaxIteration = max(nItersMax, 2000)      !good enough : 200
-  nIteration = MaxIteration ! for BICGSTAB
-  ! nIteration = 0 ! for GMRES
   iError = 0
   if (iDebugLevel > 2) then
     DoTestMe = .true.
@@ -2149,12 +2147,13 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
 
   Residual = MaxResidual
   if (useGmres) then
-  call gmres(matvec_gitm, b, x, .true., nX, &
-               MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe)
+    nIteration = 0
+    call gmres(matvec_gitm, b, x, .true., nX, &
+                  MaxIteration, Residual, 'abs', nIteration, iError, DoTestMe)
   else
     nIteration = MaxIteration
     call bicgstab(matvec_gitm, b, x, .true., nX, &
-                  Residual, 'rel', nIteration, iError, DoTestMe)
+                  Residual, 'abs', nIteration, iError, DoTestMe)
   endif
 
   if (iProc == 0) then
