@@ -522,6 +522,9 @@ subroutine initialize_fang_arrays
   use ModInputs
   use ModSources
 
+  ! Called on the first step of every block; allocate only once per processor
+  if (allocated(Fang_Ci)) return
+
   allocate(Fang_Ci(ED_N_Energies, 8), stat=iErr)
   allocate(Fang_y(ED_N_Energies, nAlts), stat=iErr)
   allocate(Fang_f(ED_N_Energies, nAlts), stat=iErr)
