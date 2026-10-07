@@ -2077,6 +2077,11 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   ! ring floats.  With both poles fixed, the full ring values are used.
   poleMeanS = sum(FullPotentialMC(1:nMagLons, 1))/nMagLons
   poleMeanN = sum(FullPotentialMC(1:nMagLons, nMagLats))/nMagLons
+  ! Fixed ring(s) at 0 when the potential comes only from the dynamo solve
+  if (UseDynamoPotentialOnly) then
+    poleMeanS = 0.0
+    poleMeanN = 0.0
+  endif
 
   do p = 1, nPair
 
@@ -2097,8 +2102,8 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
           b(iS) = poleMeanS
           x(iS) = poleMeanS
         else
-          b(iS) = FullPotentialMC(iLon, 1)
-          x(iS) = FullPotentialMC(iLon, 1)
+          b(iS) = merge(0.0, FullPotentialMC(iLon, 1), UseDynamoPotentialOnly)
+          x(iS) = b(iS)
         endif
 
         if (FloatNorth .or. &
@@ -2109,8 +2114,8 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
           b(iN) = poleMeanN
           x(iN) = poleMeanN
         else
-          b(iN) = FullPotentialMC(iLon, nMagLats)
-          x(iN) = FullPotentialMC(iLon, nMagLats)
+          b(iN) = merge(0.0, FullPotentialMC(iLon, nMagLats), UseDynamoPotentialOnly)
+          x(iN) = b(iN)
         endif
 
       else

@@ -32,6 +32,9 @@ module ModElectrodynamics
   logical :: BalanceFACs = .true.
   logical :: FixKDEquator = .true.
   ! TEST: FACs poleward of this |MLat| - zero
+  real :: FACCapCutoff = 90.0
+  ! UseDynamoPotentialOnly = .true.:no blending with the empirical model/Weimer at high latitudes.
+  logical :: UseDynamoPotentialOnly = .false.
 
   ! This is the field aligned integral in magnetic coordinates
   real, dimension(:, :), allocatable :: DivJuFieldLineMC

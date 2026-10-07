@@ -118,7 +118,7 @@ subroutine get_potential(iBlock)
   use ModInputs
   use ModUserGITM
   use ModErrors
-  use ModElectrodynamics, only: IEModel_
+  use ModElectrodynamics, only: IEModel_, UseDynamoPotentialOnly
   use ModIndicesInterfaces
   use ModMpi
   use ModIoUnit, only: UnitTmp_
@@ -228,6 +228,12 @@ subroutine get_potential(iBlock)
           LatBoundNow = DynamoHighLatBoundary
         endif
 
+        if (UseDynamoPotentialOnly) then
+          ! Use the solved (FAC + wind dynamo) potential everywhere; no blending with the empirical model at high latitudes.
+          do iDir = 1, nDir
+            TempPotential(:, :, iDir) = dynamo
+          enddo
+        else
         do iDir = 1, nDir
           do iLon = -1, nLons + 2
             do iLat = -1, nLats + 2
@@ -245,6 +251,7 @@ subroutine get_potential(iBlock)
             enddo
           enddo
         enddo
+        endif
 
       endif
 
