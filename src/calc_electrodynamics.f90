@@ -50,7 +50,7 @@ subroutine coupling_function(gamma_peak, gamma_min)
 
         ! gamma_y(iLon, jLocal) = gamma_peak - m * (y_eq_to_pole(k) - y_eq_to_pole(1))
 
-        gamma_y(iLon, jLocal) = 1.0
+        gamma_y(iLon, jLocal) = 0.03
       else
         ! Python: gy_right = np.zeros(...)
         gamma_y(iLon, jLocal) = 0.00
