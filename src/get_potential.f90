@@ -600,15 +600,22 @@ subroutine get_dynamo_potential(lons, lats, pot)
             pot(iLon, iLat) = sum(DynamoPotentialMC(:, 1))/(nMagLons + 1)
           endif
 
-          write(*, *) "Inside the low latitude, but can't find the point!"
-          write(*, *) LatIn, LonIn
+          if (.not. IsFound) then
+            write(*, *) "Inside the low latitude, but can't find the point!"
+            write(*, *) LatIn, LonIn
+          endif
 
         endif
 
       endif
 
       if (.not. IsFound) then
-        if (abs(LatIn) < MagLatMC(nMagLons, nMagLats)) &
+        if (LatIn >= MagLatMC(nMagLons, nMagLats)) then
+          ! Poleward of the dynamo grid: use the pole-ring mean
+          pot(iLon, iLat) = sum(DynamoPotentialMC(1:nMagLons, nMagLats))/nMagLons
+        else if (LatIn <= -MagLatMC(nMagLons, nMagLats)) then
+          pot(iLon, iLat) = sum(DynamoPotentialMC(1:nMagLons, 1))/nMagLons
+        else
           write(*, *) "=====> Could not find point : ", &
           LatIn, LonIn, DynamoHighLatBoundary, &
           MagLatMC(nMagLons, nMagLats)
