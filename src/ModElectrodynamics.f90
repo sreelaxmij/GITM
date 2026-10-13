@@ -21,21 +21,19 @@ module ModElectrodynamics
     SigmaPP, SigmaLL, SigmaHH, SigmaCC, SigmaPL, SigmaLP, &
     KDpm, KDlm, Kpm, Klm
   real, dimension(-1:nLons + 2, -1:nLats + 2, -1:nAlts + 2) :: ed1, ed2, je1, je2
-  ! logical :: UseSHPoleWrapping = .false.
   logical :: FloatNorth = .true.
   logical :: FloatSouth = .true.
   logical :: PinSinglePoint = .false.
   logical :: UseMeanConstraint = .true.
   logical :: CosTestSetup = .false.
   integer :: MetricTest = 0 ! 0,1,2,3
-  logical, save :: IsAWritten = .false.
   logical :: FACsOn = .true.
   logical :: BalanceFACs = .true.
   logical :: FixKDEquator = .true.
   ! TEST: FACs poleward of this |MLat| - zero
   real :: FACCapCutoff = 90.0
   ! UseDynamoPotentialOnly = .true.:no blending with the empirical model/Weimer at high latitudes.
-  logical :: UseDynamoPotentialOnly = .false.
+  logical :: UseDynamoPotentialOnly = .true.
 
   ! This is the field aligned integral in magnetic coordinates
   real, dimension(:, :), allocatable :: DivJuFieldLineMC
