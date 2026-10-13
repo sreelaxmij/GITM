@@ -549,6 +549,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   use ModInterleavedSolverHelpers, only: build_preconditioner, apply_preconditioner
   use ModInterleavedAComponents, only: build_A_components
   use ModIoUnit, only: UnitTmp_
+  use ModIE, only: iWeimer05_
   implicit none
 
   integer, intent(out) :: UAi_nMLTs, UAi_nLats
@@ -2008,7 +2009,8 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     if (FACsOn) then
       call ieModel_%get_FACs(FACsMC)
       FACsMC(nMagLons + 1, :) = FACsMC(1, :)
-      where (abs(MagLatMC) > FACCapCutoff) FACsMC = 0.0
+      if (ieModel_%iEfield_ == iWeimer05_) &
+        where (abs(MagLatMC) > FACCapCutoff) FACsMC = 0.0
       if (BalanceFACs) then
         ! Per hemisphere: scale up and down currents to their average magnitude,
         ! keeping the pattern shape but removing the net (area-weighted) current.
