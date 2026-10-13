@@ -22,9 +22,10 @@ module ModElectrodynamics
     KDpm, KDlm, Kpm, Klm
   real, dimension(-1:nLons + 2, -1:nLats + 2, -1:nAlts + 2) :: ed1, ed2, je1, je2
   ! logical :: UseSHPoleWrapping = .false.
-  logical :: FloatNorth = .false.
-  logical :: FloatSouth = .false.
+  logical :: FloatNorth = .true.
+  logical :: FloatSouth = .true.
   logical :: PinSinglePoint = .false.
+  logical :: UseMeanConstraint = .true.
   logical :: CosTestSetup = .false.
   integer :: MetricTest = 0 ! 0,1,2,3
   logical, save :: IsAWritten = .false.

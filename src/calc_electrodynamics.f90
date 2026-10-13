@@ -622,8 +622,8 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     FloatSouth = .false.
   endif
 
-  if (FloatNorth .and. FloatSouth) &
-    call stop_gitm("calc_electrodynamics: FloatNorth and FloatSouth cannot both be .true.")
+  if (FloatNorth .and. FloatSouth .and. .not. UseMeanConstraint) &
+    call stop_gitm("calc_electrodynamics: FloatNorth and FloatSouth both .true. needs UseMeanConstraint")
 
   ! DynamoHighLatBoundary now set in UA_Wrapper.f90 to enable
   ! inter-compatibility with standalone GITM.
@@ -1694,14 +1694,6 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   where (SigmaPLMC < 0.001) SigmaPLMC = 0.001
   where (SigmaLPMC > -0.001) SigmaLPMC = -0.001
 
-  ! TEST: constant Pedersen and Hall conductances
-  ! SigmaPPMC = 1.0
-  ! SigmaLLMC = 1.0
-  ! SigmaHHMC = 1.0   ! Hall
-  ! SigmaCCMC = 0.0
-  ! SigmaPLMC = 1.0   ! Hall 
-  ! SigmaLPMC = -1.0   ! Hall
-
   if (CosTestSetup) then
     ! Uniform Pedersen conductance, no Hall terms
     SigmaPPMC = 1.0
@@ -2168,6 +2160,8 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
     write(*, *) 'BiCGSTAB error code:', iError
     write(*, *) 'BiCGSTAB residual:', Residual
     write(*, *) 'BiCGSTAB iterations:', nIteration
+    if (FloatNorth .and. FloatSouth .and. UseMeanConstraint) &
+      write(*, *) 'Mean constraint: mean(x) =', sum(x)/nX
   endif
 
   call end_timing("dynamo_solver")
@@ -2507,6 +2501,7 @@ subroutine matvec_gitm(x_I, y_I, n)
     A0, AE, AW, AJp, AJm, AJpE, AJpW, AJmE, AJmW, Aopp, &
     colE, colW, colJp, colJm, colJpE, colJpW, colJmE, colJmW, colOpp
   use ModInterleavedSolverHelpers, only: apply_preconditioner
+  use ModElectrodynamics, only: FloatNorth, FloatSouth, UseMeanConstraint
   implicit none
 
   integer, intent(in) :: n
@@ -2523,6 +2518,9 @@ subroutine matvec_gitm(x_I, y_I, n)
         + AJmE*x_I(colJmE) &
         + AJmW*x_I(colJmW) &
         + Aopp*x_I(colOpp)
+
+  if (FloatNorth .and. FloatSouth .and. UseMeanConstraint) &
+    y_I = y_I - sum(x_I)/n
 
   call apply_preconditioner(y_I)
 
