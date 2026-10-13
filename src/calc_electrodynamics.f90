@@ -2146,6 +2146,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   endif
 
   Residual = MaxResidual
+
   if (useGmres) then
     nIteration = 0
     call gmres(matvec_gitm, b, x, .true., nX, &
