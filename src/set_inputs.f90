@@ -2188,12 +2188,24 @@ contains
   subroutine read_in_string(variable, iError)
     character(len=iCharLen_), intent(out) :: variable
     integer :: iError
+    integer :: iQuoteEnd
     if (iError == 0) then
       iline = iline + 1
       variable = cInputText(iline)
-      ! Remove anything after a space or TAB
-      i = index(variable, ' '); if (i > 0) variable(i:len(cLine)) = ' '
-      i = index(variable, char(9)); if (i > 0) variable(i:len(cLine)) = ' '
+      if (variable(1:1) == "'" .or. variable(1:1) == '"') then
+        ! Quoted string: keep everything inside closing quote,
+        ! so embedded spaces (in file paths) are preserved.
+        iQuoteEnd = index(variable(2:), variable(1:1))
+        if (iQuoteEnd > 0) then
+          variable = variable(2:iQuoteEnd)
+        else
+          variable = variable(2:)
+        endif
+      else
+        ! Remove anything after a space or TAB
+        i = index(variable, ' '); if (i > 0) variable(i:len(cLine)) = ' '
+        i = index(variable, char(9)); if (i > 0) variable(i:len(cLine)) = ' '
+      endif
     endif
   end subroutine read_in_string
 
