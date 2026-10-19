@@ -29,9 +29,8 @@ module ModElectrodynamics
   integer :: MetricTest = 0 ! 0,1,2,3
   logical :: FACsOn = .true.
   logical :: BalanceFACs = .true.
-  logical :: FixKDEquator = .true.
   ! TEST: FACs poleward of this |MLat| - zero (Weimer only)
-  real :: FACCapCutoff = 75.0
+  real :: FACCapCutoff = 90.0
   ! UseDynamoPotentialOnly = .true.:no blending with the empirical model/Weimer at high latitudes.
   logical :: UseDynamoPotentialOnly = .true.
 
