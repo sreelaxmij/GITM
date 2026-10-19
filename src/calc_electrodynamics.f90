@@ -2031,6 +2031,11 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   call coupling_function(gamma_peak, gamma_min)
   if (CosTestSetup) gamma_y = 0.0   ! no interhemispheric coupling in the test
   
+  if (.not. UseWindDynamo) then
+    solver_s_mc = 0.0 ! No wind term
+    wind_driven_comp = 0.0
+  endif
+
   if (CosTestSetup) then
     solver_s_mc = 0.0 ! No source term in the test
   else

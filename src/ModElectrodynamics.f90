@@ -28,6 +28,7 @@ module ModElectrodynamics
   logical :: CosTestSetup = .false.
   integer :: MetricTest = 0 ! 0,1,2,3
   logical :: FACsOn = .true.
+  logical :: UseWindDynamo = .true.
   logical :: BalanceFACs = .true.
   ! TEST: FACs poleward of this |MLat| - zero (Weimer only)
   real :: FACCapCutoff = 90.0
