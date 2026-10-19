@@ -1969,9 +1969,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   iError = 0
   FullPotentialMC = 0.0
 
-  if (.not. FloatNorth .or. .not. FloatSouth) then
-    call ieModel_%get_potential(FullPotentialMC)
-  endif
+  call ieModel_%get_potential(FullPotentialMC)
 
   ! if (iProc == 0) write(*,*) 'BC S/N:', &
   !   minval(FullPotentialMC(:,1)),        maxval(FullPotentialMC(:,1)), &
