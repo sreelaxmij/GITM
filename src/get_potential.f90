@@ -282,13 +282,29 @@ subroutine get_potential(iBlock)
   PotentialMax_South = 0.0
   PotentialMin_South = 0.0
 
-  if (maxval(Mlatitude(:, :, :, iBlock)) > 45.0) then
-    PotentialMax_North = maxval(MagnetosphericPotential(:, :, :))/1000.0
-    PotentialMin_North = minval(MagnetosphericPotential(:, :, :))/1000.0
-  endif
-  if (minval(Mlatitude(:, :, :, iBlock)) < -45.0) then
-    PotentialMax_South = maxval(MagnetosphericPotential(:, :, :))/1000.0
-    PotentialMin_South = minval(MagnetosphericPotential(:, :, :))/1000.0
+  if (UseDynamoPotentialOnly .and. UseDynamo .and. .not. Is1D) then
+    ! The solved (FAC + wind dynamo) potential is what is applied
+    if (maxval(Mlatitude(:, :, :, iBlock)) > 45.0) then
+      PotentialMax_North = maxval(DynamoPotential, &
+                                  mask=Mlatitude(:, :, :, iBlock) > 45.0)/1000.0
+      PotentialMin_North = minval(DynamoPotential, &
+                                  mask=Mlatitude(:, :, :, iBlock) > 45.0)/1000.0
+    endif
+    if (minval(Mlatitude(:, :, :, iBlock)) < -45.0) then
+      PotentialMax_South = maxval(DynamoPotential, &
+                                  mask=Mlatitude(:, :, :, iBlock) < -45.0)/1000.0
+      PotentialMin_South = minval(DynamoPotential, &
+                                  mask=Mlatitude(:, :, :, iBlock) < -45.0)/1000.0
+    endif
+  else
+    if (maxval(Mlatitude(:, :, :, iBlock)) > 45.0) then
+      PotentialMax_North = maxval(MagnetosphericPotential(:, :, :))/1000.0
+      PotentialMin_North = minval(MagnetosphericPotential(:, :, :))/1000.0
+    endif
+    if (minval(Mlatitude(:, :, :, iBlock)) < -45.0) then
+      PotentialMax_South = maxval(MagnetosphericPotential(:, :, :))/1000.0
+      PotentialMin_South = minval(MagnetosphericPotential(:, :, :))/1000.0
+    endif
   endif
 
   call get_min_value_across_pes(PotentialMin_North)
