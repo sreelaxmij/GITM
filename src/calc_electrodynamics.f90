@@ -2175,10 +2175,11 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
   DynamoPotentialMC(nMagLons + 1, :) = DynamoPotentialMC(1, :) ! Periodic boundary condition in longitude
   OldPotMC = DynamoPotentialMC ! Save the solution for use as an initial guess in the next time step
 
-! Should I remove the mean from the solution??? NOT SURE yet!
-! if (FloatNorth .or. FloatSouth) &
-!   DynamoPotentialMC = DynamoPotentialMC - sum(DynamoPotentialMC) / size(DynamoPotentialMC)
-
+  ! With both poles floating, UseMeanConstraint already gives mean(x) = 0.
+  ! With only one floating, remove the mean here
+  if (FloatNorth .neqv. FloatSouth) &
+    DynamoPotentialMC = DynamoPotentialMC - &
+                        sum(DynamoPotentialMC(1:nMagLons, :))/(nMagLons*nMagLats)
 
   if (allocated(b)) deallocate(x, y, b, rhs, d_lu, e_lu, f_lu, e1_lu, f1_lu, e2_lu, f2_lu)
 
