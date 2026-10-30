@@ -21,10 +21,10 @@ module ModElectrodynamics
     SigmaPP, SigmaLL, SigmaHH, SigmaCC, SigmaPL, SigmaLP, &
     KDpm, KDlm, Kpm, Klm
   real, dimension(-1:nLons + 2, -1:nLats + 2, -1:nAlts + 2) :: ed1, ed2, je1, je2
-  logical :: FloatNorth = .true.
-  logical :: FloatSouth = .true.
+  logical :: FloatNorth = .false.
+  logical :: FloatSouth = .false.
   logical :: PinSinglePoint = .false.
-  logical :: UseMeanConstraint = .true.
+  logical :: UseMeanConstraint = .false.
   logical :: CosTestSetup = .false.
   integer :: MetricTest = 0 ! 0,1,2,3
   logical :: FACsOn = .true.
@@ -32,6 +32,9 @@ module ModElectrodynamics
   logical :: BalanceFACs = .true.
   ! TEST: FACs poleward of this |MLat| - zero (Weimer only)
   real :: FACCapCutoff = 90.0
+  ! Solver rows with |MLat| >= this are fixed to the Weimer potential;
+  ! FAC + wind equations are solved only equatorward. Set to 90.0 to solve the whole grid.
+  real :: FixedPotentialLat = 75.0
   ! UseDynamoPotentialOnly = .true.:no blending with the empirical model/Weimer at high latitudes.
   logical :: UseDynamoPotentialOnly = .true.
 

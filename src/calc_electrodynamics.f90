@@ -218,6 +218,9 @@ contains
             A0(iN) = 1.0
           endif
 
+        else if (abs(MagLatMC(iLon, jS)) >= FixedPotentialLat) then
+          A0(iS) = 1.0
+          A0(iN) = 1.0
         else
 
           jG = jS
@@ -401,6 +404,9 @@ contains
             d_lu(iN) = 1.0
           endif
 
+        else if (abs(MagLatMC(iLon, jS)) >= FixedPotentialLat) then
+          d_lu(iS) = 1.0
+          d_lu(iN) = 1.0
         else
 
           gval = gamma_y(iLon, p)
@@ -2000,6 +2006,7 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
           ! Rows 1 and nMagLats are boundary rows (no equation), so skip them
           do j = 2, nMagLats - 1
             if (MagLatMC(1, j)*iHemi <= 0.0) cycle ! skip the other hemisphere and the equator
+            if (abs(MagLatMC(1, j)) >= FixedPotentialLat) cycle ! fixed rows: FACs unused
             do i = 1, nMagLons
               tmp = FACsMC(i, j)*cos(MagLatMC(i, j)*pi/180.0)*deltalmc(i, j)*deltapmc(i, j)
               if (tmp > 0.0) then
@@ -2092,6 +2099,11 @@ subroutine UA_calc_electrodynamics(UAi_nMLTs, UAi_nLats)
           x(iN) = b(iN)
         endif
 
+      else if (abs(MagLatMC(iLon, jS)) >= FixedPotentialLat) then
+        b(iS) = FullPotentialMC(iLon, jS)
+        x(iS) = b(iS)
+        b(iN) = FullPotentialMC(iLon, jN)
+        x(iN) = b(iN)
       else
 
         b(iS) = solver_s_mc(iLon, jS)
